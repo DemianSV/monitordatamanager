@@ -1,6 +1,13 @@
-# Charybdis Monitoring System DataManager
+# Charybdis Monitoring System DataManager 1.0.5
+
 The **Charybdis Monitoring System** project is an attempt to create a simple infrastructure and application monitoring system based on Zabbix's best practices while addressing its main weaknesses in terms of scalability and data storage.  
 **DataManager** is the server component responsible for collecting and storing data, as well as providing API functions for integrations. The key feature of **DataManager** is its compatibility with standard Zabbix agents.
+
+## Update from version 1.0.4 to 1.0.5
+
+- Use the update of the database scheme for version 1.0.5
+- Update the configuration file, or variable environment
+- Install version 1.0.5
 
 ## Installing DataManager
 
@@ -10,17 +17,17 @@ Download the latest release or clone the source code from the **master** branch:
 git clone https://github.com/DemianSV/chrdsdatamanager.git
 ```
 
-Install **Scylla DB** using the instructions on the product's website (https://opensource.docs.scylladb.com/stable/getting-started/install-scylla/).  
->For demonstration purposes, you can use our Docker-based setup for a two-node cluster. The *docker-compose.yml* file is located in the *scylla* directory.
+Install **Cassandra DB** using the instructions on the product's website (https://cassandra.apache.org/doc/stable/cassandra/installing/installing.html).  
+>For demonstration purposes, you can use our Docker-based setup for a two-node cluster. The *docker-compose.yml* file is located in the *cassandra* directory.
 
-Perform the initial database setup and load the schema from the *scylla* directory (script *createDB.cql*):
+Perform the initial database setup and load the schema from the *cassandra* directory (script *createDB.cql*):
 ```sh
-# For Scylla DB installed via Docker
-docker exec -it scylla01 cqlsh --username=username -f /root/createDB.cql
+# For Cassandra DB installed via Docker
+docker exec -it cassandra01 cqlsh --username=username -f /root/createDB.cql
 ```
 
 ```sh
-# For Scylla DB installed directly on the server
+# For Cassandra DB installed directly on the server
 cqlsh --username=username -f /path/to/createDB.cql
 ```
 
@@ -114,7 +121,9 @@ Configuration can be done in two ways:
 
 **CHRDS_ZBX_HOST**: Address for incoming agent connections,  
 **CHRDS_ZBX_PORT**: Port for incoming agent connections,  
-**CHRDS_ZBX_TYPE**: Server protocol for agent communication (tcp).
+**CHRDS_ZBX_TYPE**: Server protocol for agent communication (tcp),
+**CHRDS_ZBX_PASSIVEPORT**: Agent port for server communication
+**CHRDS_ZBX_PASSIVETYPE**: Agent protocol for server communication (tcp).
 
 **CHRDS_SWG_TITLE**: Swagger page title,  
 **CHRDS_SWG_DESCRIPTION**: Swagger page description,  
@@ -122,6 +131,19 @@ Configuration can be done in two ways:
 **CHRDS_SWG_HOST**: Full API address for Swagger,  
 **CHRDS_SWG_BASEPATH**: Base API path for Swagger,  
 **CHRDS_SWG_SCHEME**: Base protocol for Swagger.
+
+**CHRDS_SMTP_ENABLED**: Enable the sending of warning on the SMTP protocol,
+**CHRDS_SMTP_HOST**: SMTP server host,
+**CHRDS_SMTP_PORT**: SMTP server port,
+**CHRDS_SMTP_USERNAME**: SMTP user name,
+**CHRDS_SMTP_PASSWORD**: Password,
+**CHRDS_SMTP_KEEPALIVE**: Support Keepalive (true),
+**CHRDS_SMTP_TIMEOUTCONNECT**: Timeout connection, seconds (10),
+**CHRDS_SMTP_TIMEOUTSEND**:  Timeout sending, seconds (10),
+**CHRDS_SMTP_TLS**: TLS support (true/false),
+**CHRDS_SMTP_HOSTVERIFICATION**: The verification of the host (true/false),
+**CHRDS_SMTP_FROM**: The address of the sender of the message,
+**CHRDS_SMTP_QUEUE**: The size of the queue of messages (1000).
 
 **Configuration via chrdsdatamanager.json File**  
 > Parameter groups and names in the file are identical to those in the environment variables.
@@ -163,8 +185,24 @@ Configuration can be done in two ways:
 	"ZBX": {
 		"HOST": "0.0.0.0",
 		"PORT": "10051",
-		"TYPE": "tcp"
+		"TYPE": "tcp",
+        "PASSIVEPORT": "10050",
+		"PASSIVETYPE": "tcp"
 	},
+    "SMTP": {
+		"ENABLED": true,
+		"HOST": "smtp.domain.com",
+		"PORT": 587,
+		"USERNAME": "name@domain.com",
+		"PASSWORD": "",
+		"KEEPALIVE": false,
+		"TIMEOUTCONNECT": 10,
+		"TIMEOUTSEND": 10,
+		"TLS": true,
+		"HOSTVERIFICATION": false,
+		"FROM": "Monitoring <name@domain.com>",
+		"QUEUE": 1000
+    },
 	"SWG": {
 		"TITLE": "Swagger Charibdis DataManager API",
 		"DESCRIPTION": "Charibdis Monitoring System DataManager",

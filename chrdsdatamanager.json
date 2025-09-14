@@ -16,9 +16,9 @@
 	},
 	"DB": {
 		"HOSTS": ["127.0.0.1:9042", "127.0.0.1:9043"],
-		"USERNAME": "",
-		"PASSWORD": "",
-		"TLS": false,
+		"USERNAME": "chrds",
+		"PASSWORD": "chrds",
+		"TLS": true,
 		"CERTPATH": "",
 		"KEYPATH": "",
 		"CAPATH": "",
@@ -31,14 +31,30 @@
 	"ZBX": {
 		"HOST": "0.0.0.0",
 		"PORT": "10051",
-		"TYPE": "tcp"
+		"TYPE": "tcp",
+		"PASSIVEPORT": "10050",
+		"PASSIVETYPE": "tcp"
+	},
+	"SMTP": {
+		"ENABLED": false,
+		"HOST": "",
+		"PORT": 587,
+		"USERNAME": "",
+		"PASSWORD": "",
+		"KEEPALIVE": false,
+		"TIMEOUTCONNECT": 10,
+		"TIMEOUTSEND": 10,
+		"TLS": true,
+		"HOSTVERIFICATION": false,
+		"FROM": "Monitoring <name@domain.com>",
+		"QUEUE": 1000
 	},
 	"SWG": {
 		"TITLE": "Swagger Charibdis DataManager API",
 		"DESCRIPTION": "Monitoring system Charibdis DataManager",
 		"VERSION": "1.0",
-		"HOST": "127.0.0.1:6443",
+		"HOST": "host.com:6443",
 		"BASEPATH": "/api/v1",
-		"SCHEME": "http"
+		"SCHEME": "https"
 	}
 }

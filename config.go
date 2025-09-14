@@ -9,7 +9,7 @@ import (
 )
 
 type (
-	// TAppConfigHTTP Параметры запуска HTTP сервера
+	// TAppConfigHTTP HTTP server launching parameters
 	TAppConfigHTTP struct {
 		HOST         string `json:"HOST"`
 		PORT         string `json:"PORT"`
@@ -53,14 +53,16 @@ type (
 		HOSTVERIFICATION bool     `json:"HOSTVERIFICATION"`
 	}
 
-	// TAppConfigZBX Параметры запуска ZBX сервера
+	// TAppConfigZBX ZBX server launch parameters
 	TAppConfigZBX struct {
-		HOST string `json:"HOST"`
-		PORT string `json:"PORT"`
-		TYPE string `json:"TYPE"`
+		HOST        string `json:"HOST"`
+		PORT        string `json:"PORT"`
+		TYPE        string `json:"TYPE"`
+		PASSIVEPORT string `json:"PASSIVEPORT"`
+		PASSIVETYPE string `json:"PASSIVETYPE"`
 	}
 
-	// TAppConfigSWG Параметры Swagger
+	// TAppConfigSWG Swagger parameters
 	TAppConfigSWG struct {
 		TITLE       string `json:"TITLE"`
 		DESCRIPTION string `json:"DESCRIPTION"`
@@ -70,13 +72,30 @@ type (
 		SCHEME      string `json:"SCHEME"`
 	}
 
-	// TAppConfig Общая структура параметров сервиса
+	// TAppConfigSMTP SMTP server parameters
+	TAppConfigSMTP struct {
+		ENABLED          bool   `json:"ENABLED"`
+		HOST             string `json:"HOST"`
+		PORT             int    `json:"PORT"`
+		USERNAME         string `json:"USERNAME"`
+		PASSWORD         string `json:"PASSWORD"`
+		KEEPALIVE        bool   `json:"KEEPALIVE"`
+		TIMEOUTCONNECT   int    `json:"TIMEOUTCONNECT"`
+		TIMEOUTSEND      int    `json:"TIMEOUTSEND"`
+		TLS              bool   `json:"TLS"`
+		HOSTVERIFICATION bool   `json:"HOSTVERIFICATION"`
+		FROM             string `json:"FROM"`
+		QUEUE            int    `json:"QUEUE"`
+	}
+
+	// TAppConfig generalStructureOfServiceParameters
 	TAppConfig struct {
 		HTTP   TAppConfigHTTP   `json:"HTTP"`
 		WORKER TAppConfigWorker `json:"WORKER"`
 		DB     TAppConfigDB     `json:"DB"`
 		ZBX    TAppConfigZBX    `json:"ZBX"`
 		SWG    TAppConfigSWG    `json:"SWG"`
+		SMTP   TAppConfigSMTP   `json:"SMTP"`
 	}
 )
 
@@ -100,48 +119,63 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 	}
 
 	/*
-		Переменное окружение (для Docker версии):
+		Environment variables (for Docker version):
 
-		CHRDS_HTTP_HOST Адрес для входящих соединений API
-		CHRDS_HTTP_PORT Порт для входящих соединений API
-		CHRDS_HTTP_READTIMEOUT Read Timeout для HTTP сервера
-		CHRDS_HTTP_WRITETIMEOUT Write Timeout для HTTP сервера
+		CHRDS_HTTP_HOST Address for incoming API connections
+		CHRDS_HTTP_PORT Port for incoming API connections
+		CHRDS_HTTP_READTIMEOUT Read Timeout for HTTP server
+		CHRDS_HTTP_WRITETIMEOUT Write Timeout for HTTP server
 		CHRDS_HTTP_RL Requests Limit
-		CHRDS_HTTP_TLS Включение TLS взаимодействия с http сервером (true/false)
-		CHRDS_HTTP_CERTPATH Путь к сертификату для подключения к http серверу
-		CHRDS_HTTP_KEYPATH Путь к приватному ключу для подключения к http серверу
-		CHRDS_HTTP_CAPATH Путь к CA сертификату для подключения к http серверу
+		CHRDS_HTTP_TLS Enable TLS for HTTP server (true/false)
+		CHRDS_HTTP_CERTPATH Path to certificate for HTTP server
+		CHRDS_HTTP_KEYPATH Path to private key for HTTP server
+		CHRDS_HTTP_CAPATH Path to CA certificate for HTTP server
 
-		CHRDS_WORKER_POOL Колличество воркеров запускаемых при старте для активных проверок со стороны сервера
-		CHRDS_WORKER_ACTIME Интервал запуска активных проверок со стороны сервера в секундах
+		CHRDS_WORKER_POOL Number of workers started for active server checks
+		CHRDS_WORKER_ACTIME Interval for running active server checks in seconds
 
-		CHRDS_DB_HOST Массив адресов для подключения к БД, разделитель запятая (127.0.0.1:19042,127.0.0.1:29042)
-		CHRDS_DB_USERNAME Имя пользователя для подключения к БД
-		CHRDS_DB_PASSWORD Пароль для подключения к БД
-		CHRDS_DB_TLS Включение TLS взаимодействия с кластером БД (true/false)
-		CHRDS_DB_CERTPATH Путь к сертификату для подключения к БД
-		CHRDS_DB_KEYPATH Путь к приватному ключу для подключения к БД
-		CHRDS_DB_CAPATH Путь к CA сертификату для подключения к БД
-		CHRDS_DB_HOSTVERIFICATION Включение проверки HostVerification по сертификату при подключении к БД (true/false)
-		CHRDS_DB_KEYSPACE Пространство ключей (KeySpace) для подключения
-		CHRDS_DB_CONSISTENCY Параметр Consistency для данных в кластере БД
-		CHRDS_DB_CONSISTENCYREAD Параметр Consistency для выборки данных из БД
-		CHRDS_DB_TIMEOUT Значение времени ожидания выполнения запроса до принудительного завершения
+		CHRDS_DB_HOST Array of addresses for DB connection, comma-separated (127.0.0.1:19042,127.0.0.1:29042)
+		CHRDS_DB_USERNAME Username for DB connection
+		CHRDS_DB_PASSWORD Password for DB connection
+		CHRDS_DB_TLS Enable TLS for DB cluster connection (true/false)
+		CHRDS_DB_CERTPATH Path to certificate for DB connection
+		CHRDS_DB_KEYPATH Path to private key for DB connection
+		CHRDS_DB_CAPATH Path to CA certificate for DB connection
+		CHRDS_DB_HOSTVERIFICATION Enable HostVerification by certificate for DB connection (true/false)
+		CHRDS_DB_KEYSPACE Keyspace for DB connection
+		CHRDS_DB_CONSISTENCY Consistency parameter for data in DB cluster
+		CHRDS_DB_CONSISTENCYREAD Consistency parameter for reading data from DB
+		CHRDS_DB_TIMEOUT Query execution timeout before forced termination
 
-		CHRDS_ZBX_HOST Адрес для входящих соединений ZBX сервера
-		CHRDS_ZBX_PORT Порт для входящих соединений ZBX сервера
-		CHRDS_ZBX_TYPE Протокол ZBX сервера
+		CHRDS_ZBX_HOST Address for incoming ZBX server connections
+		CHRDS_ZBX_PORT Port for incoming ZBX server connections
+		CHRDS_ZBX_TYPE ZBX server protocol
+		CHRDS_ZBX_PASSIVEPORT Port of a passive agent
+		CHRDS_ZBX_PASSIVETYPE ZBC client protocol
 
-		CHRDS_SWG_TITLE Заголовок на странице Swagger
-		CHRDS_SWG_DESCRIPTION Описание на странице Swagger
-		CHRDS_SWG_VERSION Версия API на странице  Swagger
-		CHRDS_SWG_HOST Полный адрес до API для Swagger
-		CHRDS_SWG_BASEPATH Базовый путь до API для Swagger
-		CHRDS_SWG_SCHEME Базовый протокол для Swagger
+		CHRDS_SWG_TITLE Title on Swagger page
+		CHRDS_SWG_DESCRIPTION Description on Swagger page
+		CHRDS_SWG_VERSION API version on Swagger page
+		CHRDS_SWG_HOST Full API address for Swagger
+		CHRDS_SWG_BASEPATH Base API path for Swagger
+		CHRDS_SWG_SCHEME Base protocol for Swagger
+
+		CHRDS_SMTP_ENABLED Enable SMTP server (true/false)
+		CHRDS_SMTP_HOST SMTP server address
+		CHRDS_SMTP_PORT SMTP server port
+		CHRDS_SMTP_USERNAME Username for SMTP server connection
+		CHRDS_SMTP_PASSWORD Password for SMTP server connection
+		CHRDS_SMTP_KEEPALIVE Use KeepAlive connection with SMTP server (true/false)
+		CHRDS_SMTP_TIMEOUTCONNECT SMTP server connection timeout in seconds
+		CHRDS_SMTP_TIMEOUTSEND SMTP server send timeout in seconds
+		CHRDS_SMTP_TLS Use TLS connection with SMTP server (true/false)
+		CHRDS_SMTP_HOSTVERIFICATION Enable HostVerification by certificate for SMTP server connection (true/false)
+		CHRDS_SMTP_FROM From address for SMTP server
+		CHRDS_SMTP_QUEUE SMTP queue size
 	*/
 
 	log.Print("Loading configuration from alternating environment...")
-	// Основной API
+	// The main API
 	var httpHostENV string
 	httpHostENV, _ = os.LookupEnv("CHRDS_HTTP_HOST")
 	if httpHostENV != "" {
@@ -211,7 +245,7 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 		appCfg.HTTP.CAPATH = httpCAPathENV
 	}
 
-	//Worker
+	// Worker
 	var workerPoolENV string
 	workerPoolENV, _ = os.LookupEnv("CHRDS_WORKER_POOL")
 	if workerPoolENV != "" {
@@ -235,7 +269,7 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 		}
 	}
 
-	// Подключение к БД
+	// Connection to the database
 	var dbHostsENV string
 	dbHostsENV, _ = os.LookupEnv("CHRDS_DB_HOST")
 	if dbHostsENV != "" {
@@ -314,7 +348,7 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 		}
 	}
 
-	// ZBX сервер
+	// ZBX server
 	var zbxHostENV string
 	zbxHostENV, _ = os.LookupEnv("CHRDS_ZBX_HOST")
 	if zbxHostENV != "" {
@@ -329,6 +363,18 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 	zbxTypeENV, _ = os.LookupEnv("CHRDS_ZBX_TYPE")
 	if zbxTypeENV != "" {
 		appCfg.ZBX.TYPE = zbxTypeENV
+	}
+
+	// ZBX Client
+	var zbxPassivePortENV string
+	zbxPassivePortENV, _ = os.LookupEnv("CHRDS_ZBX_PASSIVEPORT")
+	if zbxPassivePortENV != "" {
+		appCfg.ZBX.PASSIVEPORT = zbxPassivePortENV
+	}
+	var zbxPassiveTypeENV string
+	zbxPassiveTypeENV, _ = os.LookupEnv("CHRDS_ZBX_PASSIVETYPE")
+	if zbxPassiveTypeENV != "" {
+		appCfg.ZBX.PASSIVETYPE = zbxPassiveTypeENV
 	}
 
 	// Swagger
@@ -363,6 +409,112 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 		appCfg.SWG.SCHEME = swgSchemeENV
 	}
 
+	// SMTP server
+	var smtpEnabledENV string
+	smtpEnabledENV, _ = os.LookupEnv("CHRDS_SMTP_ENABLED")
+	if smtpEnabledENV != "" {
+		boolValue, err := strconv.ParseBool(smtpEnabledENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_SMTP_ENABLED (" + err.Error() + ")!")
+		} else {
+			appCfg.SMTP.ENABLED = boolValue
+		}
+	}
+	var smtpHostENV string
+	smtpHostENV, _ = os.LookupEnv("CHRDS_SMTP_HOST")
+	if smtpHostENV != "" {
+		appCfg.SMTP.HOST = smtpHostENV
+	}
+	var smtpPortENV string
+	smtpPortENV, _ = os.LookupEnv("CHRDS_SMTP_PORT")
+	if smtpPortENV != "" {
+		var smtpPortINT int
+		smtpPortINT, err = strconv.Atoi(smtpPortENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_SMTP_PORT (" + err.Error() + ")!")
+		} else {
+			appCfg.SMTP.PORT = smtpPortINT
+		}
+	}
+	var smtpUserNameENV string
+	smtpUserNameENV, _ = os.LookupEnv("CHRDS_SMTP_USERNAME")
+	if smtpUserNameENV != "" {
+		appCfg.SMTP.USERNAME = smtpUserNameENV
+	}
+	var smtpPasswordENV string
+	smtpPasswordENV, _ = os.LookupEnv("CHRDS_SMTP_PASSWORD")
+	if smtpPasswordENV != "" {
+		appCfg.SMTP.PASSWORD = smtpPasswordENV
+	}
+	var smtpKeepAliveENV string
+	smtpKeepAliveENV, _ = os.LookupEnv("CHRDS_SMTP_KEEPALIVE")
+	if smtpKeepAliveENV != "" {
+		boolValue, err := strconv.ParseBool(smtpKeepAliveENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_SMTP_KEEPALIVE (" + err.Error() + ")!")
+		} else {
+			appCfg.SMTP.KEEPALIVE = boolValue
+		}
+	}
+	var smtpTimeoutConnectENV string
+	smtpTimeoutConnectENV, _ = os.LookupEnv("CHRDS_SMTP_TIMEOUTCONNECT")
+	if smtpTimeoutConnectENV != "" {
+		var smtpTimeoutConnectINT int
+		smtpTimeoutConnectINT, err = strconv.Atoi(smtpTimeoutConnectENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_SMTP_TIMEOUTCONNECT (" + err.Error() + ")!")
+		} else {
+			appCfg.SMTP.TIMEOUTCONNECT = smtpTimeoutConnectINT
+		}
+	}
+	var smtpTimeoutSendENV string
+	smtpTimeoutSendENV, _ = os.LookupEnv("CHRDS_SMTP_TIMEOUTSEND")
+	if smtpTimeoutSendENV != "" {
+		var smtpTimeoutSendINT int
+		smtpTimeoutSendINT, err = strconv.Atoi(smtpTimeoutSendENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_SMTP_TIMEOUTSEND (" + err.Error() + ")!")
+		} else {
+			appCfg.SMTP.TIMEOUTSEND = smtpTimeoutSendINT
+		}
+	}
+	var smtpTLSEnv string
+	smtpTLSEnv, _ = os.LookupEnv("CHRDS_SMTP_TLS")
+	if smtpTLSEnv != "" {
+		boolValue, err := strconv.ParseBool(smtpTLSEnv)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_SMTP_TLS (" + err.Error() + ")!")
+		} else {
+			appCfg.SMTP.TLS = boolValue
+		}
+	}
+	var smtpHostVerificationENV string
+	smtpHostVerificationENV, _ = os.LookupEnv("CHRDS_SMTP_HOSTVERIFICATION")
+	if smtpHostVerificationENV != "" {
+		boolValue, err := strconv.ParseBool(smtpHostVerificationENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_SMTP_HOSTVERIFICATION (" + err.Error() + ")!")
+		} else {
+			appCfg.SMTP.HOSTVERIFICATION = boolValue
+		}
+	}
+	var smtpFromENV string
+	smtpFromENV, _ = os.LookupEnv("CHRDS_SMTP_FROM")
+	if smtpFromENV != "" {
+		appCfg.SMTP.FROM = smtpFromENV
+	}
+	var smtpQueueENV string
+	smtpQueueENV, _ = os.LookupEnv("CHRDS_SMTP_QUEUE")
+	if smtpQueueENV != "" {
+		var smtpQueueINT int
+		smtpQueueINT, err = strconv.Atoi(smtpQueueENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_SMTP_QUEUE (" + err.Error() + ")!")
+		} else {
+			appCfg.SMTP.QUEUE = smtpQueueINT
+		}
+	}
+
 	log.Print("Configuration parameters:")
 	log.Print("HTTP.HOST: ", appCfg.HTTP.HOST)
 	log.Print("HTTP.PORT: ", appCfg.HTTP.PORT)
@@ -392,6 +544,8 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 	log.Print("ZBX.HOST: ", appCfg.ZBX.HOST)
 	log.Print("ZBX.PORT: ", appCfg.ZBX.PORT)
 	log.Print("ZBX.TYPE: ", appCfg.ZBX.TYPE)
+	log.Print("ZBX.PASSIVEPORT: ", appCfg.ZBX.PASSIVEPORT)
+	log.Print("ZBX.PASSIVETYPE: ", appCfg.ZBX.PASSIVETYPE)
 
 	log.Print("SWG.TITLE: ", appCfg.SWG.TITLE)
 	log.Print("SWG.DESCRIPTION: ", appCfg.SWG.DESCRIPTION)
@@ -399,6 +553,18 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 	log.Print("SWG.HOST: ", appCfg.SWG.HOST)
 	log.Print("SWG.BASEPATH: ", appCfg.SWG.BASEPATH)
 	log.Print("SWG.SCHEME: ", appCfg.SWG.SCHEME)
+
+	log.Print("SMTP.ENABLED: ", appCfg.SMTP.ENABLED)
+	log.Print("SMTP.HOST: ", appCfg.SMTP.HOST)
+	log.Print("SMTP.PORT: ", appCfg.SMTP.PORT)
+	log.Print("SMTP.USERNAME: ", appCfg.SMTP.USERNAME)
+	log.Print("SMTP.KEEPALIVE: ", appCfg.SMTP.KEEPALIVE)
+	log.Print("SMTP.TIMEOUTCONNECT: ", appCfg.SMTP.TIMEOUTCONNECT)
+	log.Print("SMTP.TIMEOUTSEND: ", appCfg.SMTP.TIMEOUTSEND)
+	log.Print("SMTP.TLS: ", appCfg.SMTP.TLS)
+	log.Print("SMTP.HOSTVERIFICATION: ", appCfg.SMTP.HOSTVERIFICATION)
+	log.Print("SMTP.FROM: ", appCfg.SMTP.FROM)
+	log.Print("SMTP.QUEUE: ", appCfg.SMTP.QUEUE)
 
 	return nil
 }

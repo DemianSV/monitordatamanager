@@ -13,8 +13,8 @@ COPY --from=build /build/chrdsdatamanager ./
 COPY ./docs ./docs
 COPY ./*.crt ./
 COPY ./*.key ./
-COPY ./*.pem ./
 COPY ./chrdsdatamanager.json ./
+COPY ./*.tmpl ./
 
 EXPOSE 6006 10051
 

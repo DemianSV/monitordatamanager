@@ -35,8 +35,7 @@ import (
 
 const (
 	// Version
-	Version string = "1.0.4"
-	// Version string = "1.0.5"
+	Version string = "1.0.5"
 	// LogFile General log file
 	LogFile string = "chrdsdatamanager.log"
 	// ConfigFile General configuration file
@@ -199,6 +198,14 @@ type ResponseRawTextGetArrayT struct {
 	Data []ResponseRawTextGetT `json:"data"`
 }
 
+type SMTPMessageT struct {
+	ToA     []string
+	Subject string
+	Body    string
+}
+
+var SMTPQueue chan SMTPMessageT
+
 func init() {
 	flag.StringVar(&FlagLog, "log", "stdout", "[-log file, stdout (default)]")
 	flag.Parse()
@@ -307,6 +314,18 @@ func main() {
 
 	// WorkerPool start
 	go workersRun()
+
+	// SMTP QUEUE init
+	if AppConfig.SMTP.ENABLED {
+		queueSize := 100 // Default value QUEUE
+		if AppConfig.SMTP.QUEUE > 0 {
+			queueSize = AppConfig.SMTP.QUEUE
+		}
+		SMTPQueue = make(chan SMTPMessageT, queueSize)
+		defer close(SMTPQueue)
+		// SMTP Consumer start
+		go smtpConsumer()
+	}
 
 	// HTTP Server
 	docs.SwaggerInfo.Title = AppConfig.SWG.TITLE
@@ -533,29 +552,30 @@ func postRawDataSave(w http.ResponseWriter, r *http.Request) {
 					responseRawDataSave.Metric = requestRawDataSaveArray.Data[index].Metric
 
 					spaceStatus := 0
-					if err := Session.Query(`SELECT status FROM space WHERE id = ? LIMIT 1`, requestRawDataSaveArray.Data[index].SpaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus); err != nil {
+					spaceDescription := ""
+					if err := Session.Query(`SELECT status, description FROM space WHERE id = ? LIMIT 1`, requestRawDataSaveArray.Data[index].SpaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus, &spaceDescription); err != nil {
 						log.Print(err)
 					}
 					if spaceStatus == 1 {
 						log.Print("The raw_data table is used...")
 						err := Session.Query(`
 						BEGIN BATCH
-							INSERT INTO raw_data01 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?)
-							INSERT INTO raw_data02 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?)
-							INSERT INTO raw_data03 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?)
+							INSERT INTO raw_data01 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?, ?)
+							INSERT INTO raw_data02 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?, ?)
+							INSERT INTO raw_data03 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?, ?)
 							INSERT INTO space_metric_data (space_id, metric) VALUES (?, ?)
 							INSERT INTO raw_key (space_id, synt_key, type_data, flag) values (?, ?, 'data', 0)
 						APPLY BATCH
 						`,
 							requestRawDataSaveArray.Data[index].Metric, requestRawDataSaveArray.Data[index].Value,
 							requestRawDataSaveArray.Data[index].EventTime, requestRawDataSaveArray.Data[index].SpaceID, time.Now().Format("2006.01"),
-							requestRawDataSaveArray.Data[index].Object,
+							requestRawDataSaveArray.Data[index].Object, spaceDescription,
 							requestRawDataSaveArray.Data[index].Metric, requestRawDataSaveArray.Data[index].Value,
 							requestRawDataSaveArray.Data[index].EventTime, requestRawDataSaveArray.Data[index].SpaceID, time.Now().Format("2006.01"),
-							requestRawDataSaveArray.Data[index].Object,
+							requestRawDataSaveArray.Data[index].Object, spaceDescription,
 							requestRawDataSaveArray.Data[index].Metric, requestRawDataSaveArray.Data[index].Value,
 							requestRawDataSaveArray.Data[index].EventTime, requestRawDataSaveArray.Data[index].SpaceID, time.Now().Format("2006.01"),
-							requestRawDataSaveArray.Data[index].Object,
+							requestRawDataSaveArray.Data[index].Object, spaceDescription,
 							requestRawDataSaveArray.Data[index].SpaceID, requestRawDataSaveArray.Data[index].Metric,
 							requestRawDataSaveArray.Data[index].SpaceID, time.Now().Format("2006.01")).WithContext(ctx).Exec()
 						if err != nil {
@@ -623,7 +643,8 @@ func postRawTextSave(w http.ResponseWriter, r *http.Request) {
 					responseRawDataSave.Metric = requestRawTextSaveArray.Data[index].Metric
 
 					spaceStatus := 0
-					if err := Session.Query(`SELECT status FROM space WHERE id = ? LIMIT 1`, requestRawTextSaveArray.Data[index].SpaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus); err != nil {
+					spaceDescription := ""
+					if err := Session.Query(`SELECT status, description FROM space WHERE id = ? LIMIT 1`, requestRawTextSaveArray.Data[index].SpaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus, &spaceDescription); err != nil {
 						log.Print(err)
 					}
 					if spaceStatus == 1 {
@@ -631,17 +652,17 @@ func postRawTextSave(w http.ResponseWriter, r *http.Request) {
 						log.Print("The raw_text01, 02 table is used...")
 						err := Session.Query(`
 						BEGIN BATCH
-							INSERT INTO raw_text01 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?)
-							INSERT INTO raw_text02 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?)
+							INSERT INTO raw_text01 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?, ?)
+							INSERT INTO raw_text02 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, ?, ?)
 							INSERT INTO space_metric_text (space_id, metric) VALUES (?, ?)
 							INSERT INTO raw_key (space_id, synt_key, type_data, flag) values (?, ?, 'text', 0)
 						APPLY BATCH`,
 							requestRawTextSaveArray.Data[index].Metric, requestRawTextSaveArray.Data[index].Value,
 							requestRawTextSaveArray.Data[index].EventTime, requestRawTextSaveArray.Data[index].SpaceID, time.Now().Format("2006.01"),
-							requestRawTextSaveArray.Data[index].Object,
+							requestRawTextSaveArray.Data[index].Object, spaceDescription,
 							requestRawTextSaveArray.Data[index].Metric, requestRawTextSaveArray.Data[index].Value,
 							requestRawTextSaveArray.Data[index].EventTime, requestRawTextSaveArray.Data[index].SpaceID, time.Now().Format("2006.01"),
-							requestRawTextSaveArray.Data[index].Object,
+							requestRawTextSaveArray.Data[index].Object, spaceDescription,
 							requestRawTextSaveArray.Data[index].SpaceID, requestRawTextSaveArray.Data[index].Metric,
 							requestRawTextSaveArray.Data[index].SpaceID, time.Now().Format("2006.01")).WithContext(ctx).Exec()
 						if err != nil {
@@ -1017,7 +1038,8 @@ func zbxHandleRequest(conn net.Conn, mutex01 *sync.Mutex) {
 					log.Print(err)
 				} else {
 					log.Print(requestAgentType.Request)
-					if requestAgentType.Request == "active checks" {
+					switch requestAgentType.Request {
+					case "active checks":
 						if err := json.Unmarshal(uncompressData, &requestAgent); err != nil {
 							log.Print(err)
 						} else {
@@ -1095,7 +1117,7 @@ func zbxHandleRequest(conn net.Conn, mutex01 *sync.Mutex) {
 								log.Print("Request from an unregistered agent!")
 							}
 						}
-					} else if requestAgentType.Request == "agent data" {
+					case "agent data":
 						if err := json.Unmarshal(uncompressData, &requestAgentMetrics); err != nil {
 							log.Print(err)
 						} else {
@@ -1133,26 +1155,27 @@ func zbxHandleRequest(conn net.Conn, mutex01 *sync.Mutex) {
 												eventTime := int(math.Round(eventTimeFloat))
 
 												spaceStatus := 0
-												if err := Session.Query(`SELECT status FROM space WHERE id = ? LIMIT 1`, spaceIDDB).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus); err != nil {
+												spaceDescription := ""
+												if err := Session.Query(`SELECT status, description FROM space WHERE id = ? LIMIT 1`, spaceIDDB).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus, &spaceDescription); err != nil {
 													log.Print(err)
 												}
 												if spaceStatus == 1 {
 													log.Print("The raw_data01, 02, 03 table is used...")
 													err := Session.Query(`
-												BEGIN BATCH
-													INSERT INTO raw_data01 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent')
-													INSERT INTO raw_data02 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent')
-													INSERT INTO raw_data03 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent')
-													INSERT INTO space_metric_data (space_id, metric) VALUES (?, ?)
-													INSERT INTO raw_key (space_id, synt_key, type_data, flag) values (?, ?, 'data', 0)
-												APPLY BATCH
-												`,
+													BEGIN BATCH
+														INSERT INTO raw_data01 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent', ?)
+														INSERT INTO raw_data02 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent', ?)
+														INSERT INTO raw_data03 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent', ?)
+														INSERT INTO space_metric_data (space_id, metric) VALUES (?, ?)
+														INSERT INTO raw_key (space_id, synt_key, type_data, flag) values (?, ?, 'data', 0)
+													APPLY BATCH
+													`,
 														metricDB, float32(valueFloat),
-														eventTime, spaceIDDB, time.Now().Format("2006.01"),
+														eventTime, spaceIDDB, time.Now().Format("2006.01"), spaceDescription,
 														metricDB, float32(valueFloat),
-														eventTime, spaceIDDB, time.Now().Format("2006.01"),
+														eventTime, spaceIDDB, time.Now().Format("2006.01"), spaceDescription,
 														metricDB, float32(valueFloat),
-														eventTime, spaceIDDB, time.Now().Format("2006.01"),
+														eventTime, spaceIDDB, time.Now().Format("2006.01"), spaceDescription,
 														spaceIDDB, metricDB,
 														spaceIDDB, time.Now().Format("2006.01")).WithContext(ctx).Exec()
 													if err != nil {
@@ -1169,23 +1192,24 @@ func zbxHandleRequest(conn net.Conn, mutex01 *sync.Mutex) {
 												eventTime, _ := strconv.ParseInt(fmt.Sprintf("%d%s", value.Clock, "000"), 10, 64)
 
 												spaceStatus := 0
-												if err := Session.Query(`SELECT status FROM space WHERE id = ? LIMIT 1`, spaceIDDB).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus); err != nil {
+												spaceDescription := ""
+												if err := Session.Query(`SELECT status, description FROM space WHERE id = ? LIMIT 1`, spaceIDDB).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus, &spaceDescription); err != nil {
 													log.Print(err)
 												}
 												if spaceStatus == 1 {
 													log.Print("The raw_text01, 02 table is used...")
 													err := Session.Query(`
 													BEGIN BATCH
-														INSERT INTO raw_text01 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent')
-														INSERT INTO raw_text02 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent')
+														INSERT INTO raw_text01 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent', ?)
+														INSERT INTO raw_text02 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), ?, ?, ?, 'zbxagent', ?)
 														INSERT INTO space_metric_text (space_id, metric) VALUES (?, ?)
 														INSERT INTO raw_key (space_id, synt_key, type_data, flag) values (?, ?, 'text', 0)
 													APPLY BATCH
 													`,
 														metricDB, value.Value,
-														eventTime, spaceIDDB, time.Now().Format("2006.01"),
+														eventTime, spaceIDDB, time.Now().Format("2006.01"), spaceDescription,
 														metricDB, value.Value,
-														eventTime, spaceIDDB, time.Now().Format("2006.01"),
+														eventTime, spaceIDDB, time.Now().Format("2006.01"), spaceDescription,
 														spaceIDDB, metricDB,
 														spaceIDDB, time.Now().Format("2006.01")).WithContext(ctx).Exec()
 													if err != nil {
@@ -1275,17 +1299,37 @@ func zbxUncompress(protocolData []byte, protocolSizeInt uint32, protocolFlag int
 func problem(spaceID string, modulID string, metric string, eventTime int64, valueF float32, valueS string, object string) {
 	ctx := context.Background()
 
-	scanner01 := Session.Query(`SELECT critical, warning, data_type FROM task WHERE module_id = ? AND space_id = ? AND object = ? AND metric = ?`, modulID, spaceID, object, metric).WithContext(ctx).Consistency(ConsistencyRead).Iter().Scanner()
+	scanner01 := Session.Query(`SELECT critical, warning, data_type, emaillist_id FROM task WHERE module_id = ? AND space_id = ? AND object = ? AND metric = ?`, modulID, spaceID, object, metric).WithContext(ctx).Consistency(ConsistencyRead).Iter().Scanner()
 	for scanner01.Next() {
 		var critical string
 		var warning string
 		var dataType string
+		var emailListID gocql.UUID
 
-		err := scanner01.Scan(&critical, &warning, &dataType)
+		var emailA []string
+
+		err := scanner01.Scan(&critical, &warning, &dataType, &emailListID)
 		if err != nil {
 			log.Print(err)
 			return
 		} else {
+			if emailListID != (gocql.UUID{}) {
+				scannerEMail := Session.Query(`SELECT email, status FROM emaillist_data WHERE emaillist_id = ?`, emailListID.String()).WithContext(ctx).Consistency(ConsistencyRead).Iter().Scanner()
+				for scannerEMail.Next() {
+					var email string
+					var status int
+
+					err := scannerEMail.Scan(&email, &status)
+					if err != nil {
+						log.Print(err)
+					} else {
+						if status == 1 {
+							emailA = append(emailA, email)
+						}
+					}
+				}
+			}
+
 			status := "NORMAL"
 			var valueAllType string
 			if dataType == "float" {
@@ -1322,6 +1366,26 @@ func problem(spaceID string, modulID string, metric string, eventTime int64, val
 							}
 						}
 					}
+				} else if critical != "" && warning == "" {
+					criticalFloat, err01 := strconv.ParseFloat(critical, 32)
+					if err01 != nil {
+						log.Print(err01)
+						return
+					}
+					if valueF == float32(criticalFloat) {
+						log.Print("CRITICAL")
+						status = "CRITICAL"
+					}
+				} else if critical == "" && warning != "" {
+					warningFloat, err02 := strconv.ParseFloat(warning, 32)
+					if err02 != nil {
+						log.Print(err02)
+						return
+					}
+					if valueF == float32(warningFloat) {
+						log.Print("WARNING")
+						status = "WARNING"
+					}
 				}
 			} else {
 				valueAllType = valueS
@@ -1344,6 +1408,9 @@ func problem(spaceID string, modulID string, metric string, eventTime int64, val
 							return
 						} else {
 							log.Print("PROBLEM UPDATE")
+							if len(emailA) > 0 {
+								go smtpProducer(emailA, "CHRDS"+" "+status+" "+spaceName(spaceID)+"("+moduleName(modulID)+")", metric+" "+valueAllType+" "+statusDB+" -> "+status)
+							}
 						}
 					} else {
 						log.Print("Problem time: ", eventTime-eventTimeStartDB)
@@ -1356,8 +1423,7 @@ func problem(spaceID string, modulID string, metric string, eventTime int64, val
 								log.Print("PROBLEM DELETE (NORMAL)")
 							}
 						} else {
-							err := Session.Query(`UPDATE problem SET event_time = ?, value = ? WHERE space_ID = ? AND module_id = ? AND metric = ?
-							`, eventTime, valueAllType, spaceID, modulID, metric).WithContext(ctx).Exec()
+							err := Session.Query(`UPDATE problem SET event_time = ?, value = ? WHERE space_ID = ? AND module_id = ? AND metric = ?`, eventTime, valueAllType, spaceID, modulID, metric).WithContext(ctx).Exec()
 							if err != nil {
 								log.Print(err)
 								return
@@ -1377,6 +1443,9 @@ func problem(spaceID string, modulID string, metric string, eventTime int64, val
 					return
 				} else {
 					log.Print("PROBLEM INSERT")
+					if len(emailA) > 0 {
+						go smtpProducer(emailA, "CHRDS"+" "+status+" "+spaceName(spaceID)+"("+moduleName(modulID)+")", metric+" "+valueAllType+" "+status)
+					}
 				}
 			}
 		}
@@ -1384,7 +1453,7 @@ func problem(spaceID string, modulID string, metric string, eventTime int64, val
 }
 
 func workersRun() {
-	var workerPool = AppConfig.WORKER.POOL
+	workerPool := AppConfig.WORKER.POOL
 	log.Print("WORKERS START... ", workerPool, " OK")
 
 	jobs := make(chan JobT, workerPool)
@@ -1432,7 +1501,7 @@ func zbxClient(worker int, jobs <-chan JobT) {
 				log.Print(err)
 			} else {
 				if status == 1 && object == "zbxagentpassive" {
-					conn, err := net.Dial("tcp", address+":10050")
+					conn, err := net.Dial(AppConfig.ZBX.PASSIVETYPE, address+":"+AppConfig.ZBX.PASSIVEPORT)
 					if err != nil {
 						log.Print("ZBX Agent NOT AVAILABLE!")
 					} else {
@@ -1526,26 +1595,27 @@ func zbxClient(worker int, jobs <-chan JobT) {
 							valueFloat, _ := strconv.ParseFloat(metricValue, 64)
 
 							spaceStatus := 0
-							if err := Session.Query(`SELECT status FROM space WHERE id = ? LIMIT 1`, spaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus); err != nil {
+							spaceDescription := ""
+							if err := Session.Query(`SELECT status, description FROM space WHERE id = ? LIMIT 1`, spaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus, &spaceDescription); err != nil {
 								log.Print(err)
 							}
 							if spaceStatus == 1 {
 								log.Print("The raw_data01, 02, 03 table is used...")
 								err := Session.Query(`
 						BEGIN BATCH
-							INSERT INTO raw_data01 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive')
-							INSERT INTO raw_data02 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive')
-							INSERT INTO raw_data03 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive')
+							INSERT INTO raw_data01 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive', ?)
+							INSERT INTO raw_data02 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive', ?)
+							INSERT INTO raw_data03 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive', ?)
 							INSERT INTO space_metric_data (space_id, metric) VALUES (?, ?)
 							INSERT INTO raw_key (space_id, synt_key, type_data, flag) values (?, ?, 'data', 0)
 						APPLY BATCH
 						`,
 									metric, float32(valueFloat),
-									spaceID, time.Now().Format("2006.01"),
+									spaceID, time.Now().Format("2006.01"), spaceDescription,
 									metric, float32(valueFloat),
-									spaceID, time.Now().Format("2006.01"),
+									spaceID, time.Now().Format("2006.01"), spaceDescription,
 									metric, float32(valueFloat),
-									spaceID, time.Now().Format("2006.01"),
+									spaceID, time.Now().Format("2006.01"), spaceDescription,
 									spaceID, metric,
 									spaceID, time.Now().Format("2006.01")).WithContext(ctx).Exec()
 								if err != nil {
@@ -1557,20 +1627,24 @@ func zbxClient(worker int, jobs <-chan JobT) {
 							}
 						} else {
 							spaceStatus := 0
-							if err := Session.Query(`SELECT status FROM space WHERE id = ? LIMIT 1`, spaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus); err != nil {
+							spaceDescription := ""
+							if err := Session.Query(`SELECT status, description FROM space WHERE id = ? LIMIT 1`, spaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceStatus, &spaceDescription); err != nil {
 								log.Print(err)
 							}
 							if spaceStatus == 1 {
-								log.Print("The raw_data01, 02, 03 table is used...")
+								log.Print("The raw_text01, 02 table is used...")
 								err := Session.Query(`
 							BEGIN BATCH
-								INSERT INTO raw_text01 (metric, value, status, create_time, event_time, space_id, synt_key, object) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive')
+								INSERT INTO raw_text01 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive', ?)
+								INSERT INTO raw_text02 (metric, value, status, create_time, event_time, space_id, synt_key, object, space_description) VALUES (?, ?, 1, toTimestamp(now()), toTimestamp(now()), ?, ?, 'zbxagentpassive', ?)
 								INSERT INTO space_metric_text (space_id, metric) VALUES (?, ?)
 								INSERT INTO raw_key (space_id, synt_key, type_data, flag) values (?, ?, 'text', 0)
 							APPLY BATCH
 							`,
 									metric, metricValue,
-									spaceID, time.Now().Format("2006.01"),
+									spaceID, time.Now().Format("2006.01"), spaceDescription,
+									metric, metricValue,
+									spaceID, time.Now().Format("2006.01"), spaceDescription,
 									spaceID, metric,
 									spaceID, time.Now().Format("2006.01")).WithContext(ctx).Exec()
 								if err != nil {
@@ -1585,4 +1659,24 @@ func zbxClient(worker int, jobs <-chan JobT) {
 			}
 		}
 	}
+}
+
+func spaceName(spaceID string) string {
+	ctx := context.Background()
+	var spaceName string
+	if err := Session.Query(`SELECT description FROM space WHERE id = ? LIMIT 1`, spaceID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&spaceName); err != nil {
+		log.Print(err)
+		return ""
+	}
+	return spaceName
+}
+
+func moduleName(moduleID string) string {
+	ctx := context.Background()
+	var moduleName string
+	if err := Session.Query(`SELECT description FROM registration WHERE id = ? LIMIT 1`, moduleID).WithContext(ctx).Consistency(ConsistencyRead).Scan(&moduleName); err != nil {
+		log.Print(err)
+		return ""
+	}
+	return moduleName
 }
