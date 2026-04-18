@@ -1,13 +1,13 @@
-# Charybdis Monitoring System DataManager 1.0.5
+# Charybdis Monitoring System DataManager 1.1.0
 
 The **Charybdis Monitoring System** project is an attempt to create a simple infrastructure and application monitoring system based on Zabbix's best practices while addressing its main weaknesses in terms of scalability and data storage.  
 **DataManager** is the server component responsible for collecting and storing data, as well as providing API functions for integrations. The key feature of **DataManager** is its compatibility with standard Zabbix agents.
 
-## Update from version 1.0.4 to 1.0.5
+## Update from version 1.0.4 or 1.0.5 to 1.1.0
 
-- Use the update of the database scheme for version 1.0.5
+- Use the update of the database scheme for version 1.1.0
 - Update the configuration file, or variable environment
-- Install version 1.0.5
+- Install version 1.1.0
 
 ## Installing DataManager
 
@@ -31,7 +31,7 @@ docker exec -it cassandra01 cqlsh --username=username -f /root/createDB.cql
 cqlsh --username=username -f /path/to/createDB.cql
 ```
 
->**Use your own credentials and script paths for the initial setup!**
+**Use your own credentials and script paths for the initial setup!**
 
 ### Installing DataManager via Docker Image
 **Building and Running**  
@@ -92,38 +92,56 @@ Configuration can be done in two ways:
 > **HTTP**: Parameter group,  
 > **HOST**: Configuration parameter.
 
-**List of Supported Variables**  
+**List of Supported Variables**
+
+**CHRDS_DM_ID**: A unique identifier of the DataManager instance, required for precise distribution of tasks between instances (optional parameter).
+
+**CHRDS_TLS_CERTPATH**: Path to the certificate for server connections,
+**CHRDS_TLS_KEYPATH**: Path to the private key for server connections,
+**CHRDS_TLS_KEYPASSWORD**: The password for the private key,
+**CHRDS_TLS_CAPATH**: Path to the CA certificate for server connections.
+
 **CHRDS_HTTP_HOST**: Address for incoming HTTP server connections (API, Swagger),  
 **CHRDS_HTTP_PORT**: Port for incoming HTTP server connections,  
 **CHRDS_HTTP_READTIMEOUT**: HTTP server Read TimeOut,  
 **CHRDS_HTTP_WRITETIMEOUT**: HTTP server Write TimeOut,  
 **CHRDS_HTTP_RL**: Requests Limit, HTTP server request rate limit per second,  
-**CHRDS_HTTP_TLS**: Enable TLS for HTTP server (true/false),  
-**CHRDS_HTTP_CERTPATH**: Path to the certificate for HTTP server connections,  
-**CHRDS_HTTP_KEYPATH**: Path to the private key for HTTP server connections,  
-**CHRDS_HTTP_CAPATH**: Path to the CA certificate for HTTP server connections.
-
-**CHRDS_WORKER_POOL**: Number of concurrent workers for active server-side checks,  
-**CHRDS_WORKER_ACTIME**: Interval (in seconds) for running active server-side checks.
+**CHRDS_HTTP_TLS**: Enable TLS for HTTP server (true/false),
+**CHRDS_HTTP_TLS_SKIPVERIFY**: Do not check the TLS certificate.
 
 **CHRDS_DB_HOST**: Array of database node addresses, comma-separated (e.g., 127.0.0.1:9042,127.0.0.1:9043),  
 **CHRDS_DB_USERNAME**: Database username,  
 **CHRDS_DB_PASSWORD**: Database password,  
 **CHRDS_DB_TLS**: Enable TLS for database cluster connections (true/false),  
-**CHRDS_DB_CERTPATH**: Path to the certificate for database connections,  
-**CHRDS_DB_KEYPATH**: Path to the private key for database connections,  
-**CHRDS_DB_CAPATH**: Path to the CA certificate for database connections,  
+**CHRDS_DB_TTLS_SKIPVERIFY**: Do not check the TLS certificate,
 **CHRDS_DB_KEYSPACE**: KeySpace for the connection,  
-**CHRDS_DB_HOSTVERIFICATION**: Enable HostVerification for certificate validation (true/false),  
 **CHRDS_DB_CONSISTENCY**: Consistency parameter for database writes,  
 **CHRDS_DB_CONSISTENCYREAD**: Consistency parameter for database reads,  
 **CHRDS_DB_TIMEOUT**: Query execution timeout (in milliseconds).
+**CHRDS_BATCHSIZE**: 
 
 **CHRDS_ZBX_HOST**: Address for incoming agent connections,  
 **CHRDS_ZBX_PORT**: Port for incoming agent connections,  
 **CHRDS_ZBX_TYPE**: Server protocol for agent communication (tcp),
-**CHRDS_ZBX_PASSIVEPORT**: Agent port for server communication
-**CHRDS_ZBX_PASSIVETYPE**: Agent protocol for server communication (tcp).
+**CHRDS_ZBX_PASSIVEPORT**: Agent port for server communication,
+**CHRDS_ZBX_PASSIVETYPE**: Agent protocol for server communication (tcp),
+**CHRDS_ZBX_TLS**: Enable TLS for zbx connections (true/false), 
+**CHRDS_ZBX_TLS_SKIPVERIFY**: Do not check the TLS certificate,
+**CHRDS_ZBX_WORKER_POOL**: Number of concurrent workers for active server-side checks,
+**CHRDS_ZBX_WORKER_ACTIME**: Interval (in seconds) for running active server-side checks.
+
+**CHRDS_PRMTEXPORTER_ENABLED**: Enable Prometheus exporter for DataManager,
+**CHRDS_PRMTEXPORTER_METRICS_PATH** Set the path for publishing metrics.
+
+**CHRDS_PRMTSCRAPER_ENABLED**: Enable Prometheus metrics polling feature,
+**CHRDS_PRMTSCRAPER_INTERVAL**: Polling interval in seconds,
+**CHRDS_PRMTSCRAPER_TIMEOUT**: Timeout while waiting for a response to a metrics request,
+**CHRDS_PRMTSCRAPER_RETRYATTEMPTS**: Number of repeated requests if unsuccessful,
+**CHRDS_PRMTSCRAPER_RETRYDELAY**:
+**CHRDS_PRMTSCRAPER_MAXCONNECTIONS**:
+**CHRDS_PRMTSCRAPER_WORKERSPOOL**: Pool size for concurrent requests,
+**CHRDS_PRMTSCRAPER_TLS**: Enable TLS for prometheus connections (true/false),
+**CHRDS_PRMTSCRAPER_TLS_SKIPVERIFY**: Do not check the TLS certificate.
 
 **CHRDS_SWG_TITLE**: Swagger page title,  
 **CHRDS_SWG_DESCRIPTION**: Swagger page description,  
@@ -154,62 +172,83 @@ Configuration can be done in two ways:
 
 ```json
 {
+	"DM": {
+		"ID": ""
+	},
+	"TLS": {
+		"CERTPATH": "server.crt",
+		"KEYPATH": "server.key",
+		"KEYPASSWORD": "",
+		"CAPATH": "rootCA.crt"
+	},
 	"HTTP": {
 		"HOST": "",
 		"PORT": "6006",
 		"READTIMEOUT": 10,
 		"WRITETIMEOUT": 10,
 		"RL": 100,
-		"TLS": false,
-		"CERTPATH": "",
-		"KEYPATH": "",
-		"CAPATH": ""
-	},
-	"WORKER": {
-		"NUM": 10,
-		"ACTIME": 60
+		"TLS": true,
+		"SKIPVERIFY": true
 	},
 	"DB": {
 		"HOSTS": ["127.0.0.1:9042", "127.0.0.1:9043"],
 		"USERNAME": "chrds",
 		"PASSWORD": "",
-		"TLS": false,
-		"CERTPATH": "",
-		"KEYPATH": "",
-		"CAPATH": "",
+		"TLS": true,
+		"SKIPVERIFY": true,
 		"KEYSPACE": "chrds",
-		"HOSTVERIFICATION": false,
 		"CONSISTENCY": "Quorum",
-		"TIMEOUT": 10000
+		"CONSISTENCYREAD": "One",
+		"TIMEOUT": 10000,
+		"BATCHSIZE": 300
 	},
 	"ZBX": {
 		"HOST": "0.0.0.0",
 		"PORT": "10051",
 		"TYPE": "tcp",
-        "PASSIVEPORT": "10050",
-		"PASSIVETYPE": "tcp"
+		"PASSIVEPORT": "10050",
+		"PASSIVETYPE": "tcp",
+		"TLS": false,
+		"SKIPVERIFY": true,
+		"WORKERSPOOL": 3,
+		"WORKERACTIME": 60
 	},
-    "SMTP": {
+	"PRMTSCRAPER": {
 		"ENABLED": true,
-		"HOST": "smtp.domain.com",
+		"INTERVAL": 60,
+		"TIMEOUT": 10,
+		"RETRYATTEMPTS": 3,
+		"RETRYDELAY": 2,
+		"MAXCONNECTIONS": 10,
+		"WORKERSPOOL": 1,
+		"TLS": false,
+		"SKIPVERIFY": true
+	},
+	"PRMTEXPORTER": {
+		"ENABLED": true,
+		"METRICSPATH": "/metrics"
+	},
+	"SMTP": {
+		"ENABLED": false,
+		"HOST": "",
 		"PORT": 587,
-		"USERNAME": "name@domain.com",
+		"USERNAME": "",
 		"PASSWORD": "",
 		"KEEPALIVE": false,
 		"TIMEOUTCONNECT": 10,
 		"TIMEOUTSEND": 10,
 		"TLS": true,
-		"HOSTVERIFICATION": false,
-		"FROM": "Monitoring <name@domain.com>",
+		"SKIPVERIFY": true,
+		"FROM": "Monitoring",
 		"QUEUE": 1000
-    },
+	},
 	"SWG": {
 		"TITLE": "Swagger Charibdis DataManager API",
-		"DESCRIPTION": "Charibdis Monitoring System DataManager",
+		"DESCRIPTION": "Monitoring system Charibdis DataManager",
 		"VERSION": "1.0",
-		"HOST": "127.0.0.1:6443",
+		"HOST": "your.domain:6443",
 		"BASEPATH": "/api/v1",
-		"SCHEME": "http"
+		"SCHEME": "https"
 	}
 }
 ```

@@ -1,4 +1,13 @@
 {
+	"DM": {
+		"ID": ""
+	},
+	"TLS": {
+		"CERTPATH": "",
+		"KEYPATH": "",
+		"KEYPASSWORD": "",
+		"CAPATH": ""
+	},
 	"HTTP": {
 		"HOST": "",
 		"PORT": "6006",
@@ -6,34 +15,45 @@
 		"WRITETIMEOUT": 10,
 		"RL": 100,
 		"TLS": false,
-		"CERTPATH": "",
-		"KEYPATH": "",
-		"CAPATH": ""
-	},
-	"WORKER": {
-		"POOL": 10,
-		"ACTIME": 60
+		"SKIPVERIFY": true
 	},
 	"DB": {
 		"HOSTS": ["127.0.0.1:9042", "127.0.0.1:9043"],
 		"USERNAME": "chrds",
-		"PASSWORD": "chrds",
-		"TLS": true,
-		"CERTPATH": "",
-		"KEYPATH": "",
-		"CAPATH": "",
-		"HOSTVERIFICATION": false,
+		"PASSWORD": "",
+		"TLS": false,
+		"SKIPVERIFY": true,
 		"KEYSPACE": "chrds",
 		"CONSISTENCY": "Quorum",
 		"CONSISTENCYREAD": "One",
-		"TIMEOUT": 10000
+		"TIMEOUT": 10000,
+		"BATCHSIZE": 300
 	},
 	"ZBX": {
 		"HOST": "0.0.0.0",
 		"PORT": "10051",
 		"TYPE": "tcp",
 		"PASSIVEPORT": "10050",
-		"PASSIVETYPE": "tcp"
+		"PASSIVETYPE": "tcp",
+		"TLS": false,
+		"SKIPVERIFY": true,
+		"WORKERSPOOL": 3,
+		"WORKERACTIME": 60
+	},
+	"PRMTSCRAPER": {
+		"ENABLED": true,
+		"INTERVAL": 60,
+		"TIMEOUT": 10,
+		"RETRYATTEMPTS": 3,
+		"RETRYDELAY": 2,
+		"MAXCONNECTIONS": 10,
+		"WORKERSPOOL": 1,
+		"TLS": false,
+		"SKIPVERIFY": true
+	},
+	"PRMTEXPORTER": {
+		"ENABLED": true,
+		"METRICSPATH": "/metrics"
 	},
 	"SMTP": {
 		"ENABLED": false,
@@ -45,15 +65,15 @@
 		"TIMEOUTCONNECT": 10,
 		"TIMEOUTSEND": 10,
 		"TLS": true,
-		"HOSTVERIFICATION": false,
-		"FROM": "Monitoring <name@domain.com>",
+		"SKIPVERIFY": true,
+		"FROM": "Monitoring",
 		"QUEUE": 1000
 	},
 	"SWG": {
 		"TITLE": "Swagger Charibdis DataManager API",
 		"DESCRIPTION": "Monitoring system Charibdis DataManager",
 		"VERSION": "1.0",
-		"HOST": "host.com:6443",
+		"HOST": "your.domain:6443",
 		"BASEPATH": "/api/v1",
 		"SCHEME": "https"
 	}

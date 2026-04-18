@@ -2,16 +2,115 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Monitoring message</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHRDS Monitoring ALERT</title>
+    <style>
+        /* Общие стили */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+        }
+        
+        .email-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+        
+        .email-header {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .email-body {
+            padding: 20px;
+        }
+        
+        .email-footer {
+            padding: 15px 20px;
+            background-color: #f9f9f9;
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+        }
+        
+        .alert-icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .alert-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .alert-message {
+            margin-bottom: 20px;
+        }
+        
+        .action-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4a6ee0;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .button-container {
+            text-align: center;
+        }
+        
+        /* Специфичные стили для каждого типа уведомлений */
+        .CRITICAL-alert .email-header {
+            background-color: #f34030;
+            color: white;
+        }
+        
+        .WARNING-alert .email-header {
+            background-color: #ffd301;
+            color: white;
+        }
+        
+        .NORMAL-alert .email-header {
+            background-color: #66be34;
+            color: white;
+        }
+        
+        .preview-title {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+    </style>
 </head>
 <body>
-    <h2>{{ .Tittle }}</h2>
-    <p> {{ .Text }} </p>
-    <br><br>
-    <p>
-    --<br>
-    This is an automated message from the CHRDS monitoring system<br>
-    Do not reply to this message
-    </p>
+    <!-- Alert -->
+    <div class="email-container {{ .AlertType }}-alert">
+        <div class="email-header">
+            <div class="alert-title">{{ .AlertType }}</div>
+        </div>
+        <div class="email-body">
+            <div class="alert-message">
+                <p><strong>{{ .Tittle }}</strong></p>
+                <p>{{ .Text }}</p>
+            </div>
+            <div class="button-container">
+                <a href="https://your.domain:6443/problem" class="action-button">Go to monitoring</a>
+            </div>
+        </div>
+        <div class="email-footer">
+            This is an automatic notification. Please do not reply to this letter.
+        </div>
+    </div>
 </body>
 </html>

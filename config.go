@@ -6,7 +6,19 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
+
+type TAppConfigDM struct {
+	ID string `json:"ID"`
+}
+
+type TAppConfigTLS struct {
+	CERTPATH    string `json:"CERTPATH"`
+	KEYPATH     string `json:"KEYPATH"`
+	KEYPASSWORD string `json:"KEYPASSWORD"`
+	CAPATH      string `json:"CAPATH"`
+}
 
 type (
 	// TAppConfigHTTP HTTP server launching parameters
@@ -17,13 +29,7 @@ type (
 		WRITETIMEOUT int    `json:"WRITETIMEOUT"`
 		RL           int    `json:"RL"`
 		TLS          bool   `json:"TLS"`
-		CERTPATH     string `json:"CERTPATH"`
-		KEYPATH      string `json:"KEYPATH"`
-		CAPATH       string `json:"CAPATH"`
-	}
-	TAppConfigWorker struct {
-		POOL   int `json:"POOL"`
-		ACTIME int `json:"ACTIME"`
+		SKIPVERIFY   bool   `json:"SKIPVERIFY"`
 	}
 
 	/*
@@ -39,27 +45,48 @@ type (
 		LocalOn
 	*/
 	TAppConfigDB struct {
-		HOSTS            []string `json:"HOSTS"`
-		USERNAME         string   `json:"USERNAME"`
-		PASSWORD         string   `json:"PASSWORD"`
-		CERTPATH         string   `json:"CERTPATH"`
-		KEYPATH          string   `json:"KEYPATH"`
-		CAPATH           string   `json:"CAPATH"`
-		KEYSPACE         string   `json:"KEYSPACE"`
-		CONSISTENCY      string   `json:"CONSISTENCY"`
-		CONSISTENCYREAD  string   `json:"CONSISTENCYREAD"`
-		TIMEOUT          int      `json:"TIMEOUT"`
-		TLS              bool     `json:"TLS"`
-		HOSTVERIFICATION bool     `json:"HOSTVERIFICATION"`
+		HOSTS           []string `json:"HOSTS"`
+		USERNAME        string   `json:"USERNAME"`
+		PASSWORD        string   `json:"PASSWORD"`
+		KEYSPACE        string   `json:"KEYSPACE"`
+		CONSISTENCY     string   `json:"CONSISTENCY"`
+		CONSISTENCYREAD string   `json:"CONSISTENCYREAD"`
+		TIMEOUT         int      `json:"TIMEOUT"`
+		TLS             bool     `json:"TLS"`
+		SKIPVERIFY      bool     `json:"SKIPVERIFY"`
+		BATCHSIZE       int      `json:"BATCHSIZE"`
 	}
 
 	// TAppConfigZBX ZBX server launch parameters
 	TAppConfigZBX struct {
-		HOST        string `json:"HOST"`
-		PORT        string `json:"PORT"`
-		TYPE        string `json:"TYPE"`
-		PASSIVEPORT string `json:"PASSIVEPORT"`
-		PASSIVETYPE string `json:"PASSIVETYPE"`
+		HOST         string `json:"HOST"`
+		PORT         string `json:"PORT"`
+		TYPE         string `json:"TYPE"`
+		PASSIVEPORT  string `json:"PASSIVEPORT"`
+		PASSIVETYPE  string `json:"PASSIVETYPE"`
+		TLS          bool   `json:"TLS"`
+		SKIPVERIFY   bool   `json:"SKIPVERIFY"`
+		WORKERPOOL   int    `json:"WORKERPOOL"`
+		WORKERACTIME int    `json:"WORKERACTIME"`
+	}
+
+	// TAppConfigPRMTScraper Parameters for the Prometheus scraper
+	TAppConfigPRMTScraper struct {
+		ENABLED        bool          `json:"ENABLED"`
+		INTERVAL       time.Duration `json:"INTERVAL"`
+		TIMEOUT        time.Duration `json:"TIMEOUT"`
+		RETRYATTEMPTS  int           `json:"RETRYATTEMPTS"`
+		RETRYDELAY     time.Duration `json:"RETRYDELAY"`
+		MAXCONNECTIONS int           `json:"MAXCONNECTIONS"`
+		WORKERSPOOL    int           `json:"WORKERSPOOL"`
+		TLS            bool          `json:"TLS"`
+		SKIPVERIFY     bool          `json:"SKIPVERIFY"`
+	}
+
+	// TAppConfigPRMTExporter Parameters for the Prometheus exporter
+	TAppConfigPRMTExporter struct {
+		ENABLED     bool   `json:"ENABLED"`
+		METRICSPATH string `json:"METRICSPATH"`
 	}
 
 	// TAppConfigSWG Swagger parameters
@@ -74,28 +101,31 @@ type (
 
 	// TAppConfigSMTP SMTP server parameters
 	TAppConfigSMTP struct {
-		ENABLED          bool   `json:"ENABLED"`
-		HOST             string `json:"HOST"`
-		PORT             int    `json:"PORT"`
-		USERNAME         string `json:"USERNAME"`
-		PASSWORD         string `json:"PASSWORD"`
-		KEEPALIVE        bool   `json:"KEEPALIVE"`
-		TIMEOUTCONNECT   int    `json:"TIMEOUTCONNECT"`
-		TIMEOUTSEND      int    `json:"TIMEOUTSEND"`
-		TLS              bool   `json:"TLS"`
-		HOSTVERIFICATION bool   `json:"HOSTVERIFICATION"`
-		FROM             string `json:"FROM"`
-		QUEUE            int    `json:"QUEUE"`
+		ENABLED        bool   `json:"ENABLED"`
+		HOST           string `json:"HOST"`
+		PORT           int    `json:"PORT"`
+		USERNAME       string `json:"USERNAME"`
+		PASSWORD       string `json:"PASSWORD"`
+		KEEPALIVE      bool   `json:"KEEPALIVE"`
+		TIMEOUTCONNECT int    `json:"TIMEOUTCONNECT"`
+		TIMEOUTSEND    int    `json:"TIMEOUTSEND"`
+		TLS            bool   `json:"TLS"`
+		SKIPVERIFY     bool   `json:"SKIPVERIFY"`
+		FROM           string `json:"FROM"`
+		QUEUE          int    `json:"QUEUE"`
 	}
 
 	// TAppConfig generalStructureOfServiceParameters
 	TAppConfig struct {
-		HTTP   TAppConfigHTTP   `json:"HTTP"`
-		WORKER TAppConfigWorker `json:"WORKER"`
-		DB     TAppConfigDB     `json:"DB"`
-		ZBX    TAppConfigZBX    `json:"ZBX"`
-		SWG    TAppConfigSWG    `json:"SWG"`
-		SMTP   TAppConfigSMTP   `json:"SMTP"`
+		DM           TAppConfigDM           `json:"DM"`
+		TLS          TAppConfigTLS          `json:"TLS"`
+		HTTP         TAppConfigHTTP         `json:"HTTP"`
+		DB           TAppConfigDB           `json:"DB"`
+		ZBX          TAppConfigZBX          `json:"ZBX"`
+		SWG          TAppConfigSWG          `json:"SWG"`
+		SMTP         TAppConfigSMTP         `json:"SMTP"`
+		PRMTEXPORTER TAppConfigPRMTExporter `json:"PRMTEXPORTER"`
+		PRMTSCRAPER  TAppConfigPRMTScraper  `json:"PRMTSCRAPER"`
 	}
 )
 
@@ -120,6 +150,12 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 
 	/*
 		Environment variables (for Docker version):
+		CHRDS_DM_ID Unique identifier of the DataManager instance
+
+		CHRDS_TLS_CERTPATH Path to certificate for main service
+		CHRDS_TLS_KEYPATH Path to private key for main service
+		CHRDS_TLS_KEYPASSWORD The password for the TLS private key
+		CHRDS_TLS_CAPATH Path to CA certificate for main service
 
 		CHRDS_HTTP_HOST Address for incoming API connections
 		CHRDS_HTTP_PORT Port for incoming API connections
@@ -127,31 +163,41 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 		CHRDS_HTTP_WRITETIMEOUT Write Timeout for HTTP server
 		CHRDS_HTTP_RL Requests Limit
 		CHRDS_HTTP_TLS Enable TLS for HTTP server (true/false)
-		CHRDS_HTTP_CERTPATH Path to certificate for HTTP server
-		CHRDS_HTTP_KEYPATH Path to private key for HTTP server
-		CHRDS_HTTP_CAPATH Path to CA certificate for HTTP server
-
-		CHRDS_WORKER_POOL Number of workers started for active server checks
-		CHRDS_WORKER_ACTIME Interval for running active server checks in seconds
+		CHRDS_HTTP_TLS_SKIPVERIFY Enable insecure skip verify for HTTP server (true/false)
 
 		CHRDS_DB_HOST Array of addresses for DB connection, comma-separated (127.0.0.1:19042,127.0.0.1:29042)
 		CHRDS_DB_USERNAME Username for DB connection
 		CHRDS_DB_PASSWORD Password for DB connection
 		CHRDS_DB_TLS Enable TLS for DB cluster connection (true/false)
-		CHRDS_DB_CERTPATH Path to certificate for DB connection
-		CHRDS_DB_KEYPATH Path to private key for DB connection
-		CHRDS_DB_CAPATH Path to CA certificate for DB connection
-		CHRDS_DB_HOSTVERIFICATION Enable HostVerification by certificate for DB connection (true/false)
+		CHRDS_DB_TLS_SKIPVERIFY Disable HostVerification by certificate for DB connection (true/false)
 		CHRDS_DB_KEYSPACE Keyspace for DB connection
 		CHRDS_DB_CONSISTENCY Consistency parameter for data in DB cluster
 		CHRDS_DB_CONSISTENCYREAD Consistency parameter for reading data from DB
 		CHRDS_DB_TIMEOUT Query execution timeout before forced termination
+		CHRDS_BATCHSIZE Batch sizes are formed by the application
 
 		CHRDS_ZBX_HOST Address for incoming ZBX server connections
 		CHRDS_ZBX_PORT Port for incoming ZBX server connections
 		CHRDS_ZBX_TYPE ZBX server protocol
 		CHRDS_ZBX_PASSIVEPORT Port of a passive agent
 		CHRDS_ZBX_PASSIVETYPE ZBC client protocol
+		CHRDS_ZBX_TLS Enable TLS for ZBX agent connection (true/false)
+		CHRDS_ZBX_SKIPVERIFY Enable insecure skip verify for ZBX agent connection (true/false)
+		CHRDS_ZBX_WORKER_POOL Number of workers started for active server checks
+		CHRDS_ZBX_WORKER_ACTIME Interval for running active server checks in seconds
+
+		CHRDS_PRMTEXPORTER_ENABLED Enable Prometheus exporter (true/false)
+		CHRDS_PRMTEXPORTER_METRICSPATH Path to metrics for Prometheus exporter
+
+		CHRDS_PRMTSCRAPER_ENABLED Enable Prometheus scraper (true/false)
+		CHRDS_PRMTSCRAPER_INTERVAL Interval for Prometheus scraper in seconds
+		CHRDS_PRMTSCRAPER_TIMEOUT Timeout for Prometheus scraper in seconds
+		CHRDS_PRMTSCRAPER_RETRYATTEMPTS Number of retry attempts for Prometheus scraper
+		CHRDS_PRMTSCRAPER_RETRYDELAY Delay between retry attempts for Prometheus scraper in seconds
+		CHRDS_PRMTSCRAPER_MAXCONNECTIONS Maximum number of simultaneous connections for Prometheus scraper
+		CHRDS_PRMTSCRAPER_WORKERSPOOL Number of workers for Prometheus scraper
+		CHRDS_PRMTSCRAPER_TLS Enable TLS for Prometheus scraper (true/false)
+		CHRDS_PRMTSCRAPER_TLS_SKIPVERIFY Disable insecure skip verify for Prometheus scraper (true/false)
 
 		CHRDS_SWG_TITLE Title on Swagger page
 		CHRDS_SWG_DESCRIPTION Description on Swagger page
@@ -169,13 +215,43 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 		CHRDS_SMTP_TIMEOUTCONNECT SMTP server connection timeout in seconds
 		CHRDS_SMTP_TIMEOUTSEND SMTP server send timeout in seconds
 		CHRDS_SMTP_TLS Use TLS connection with SMTP server (true/false)
-		CHRDS_SMTP_HOSTVERIFICATION Enable HostVerification by certificate for SMTP server connection (true/false)
+		CHRDS_SMTP_TLS_SKIPVERIFY Disable insecure skip verify for Prometheus scraper (true/false)
 		CHRDS_SMTP_FROM From address for SMTP server
 		CHRDS_SMTP_QUEUE SMTP queue size
 	*/
 
 	log.Print("Loading configuration from alternating environment...")
-	// The main API
+
+	// DM
+	var dmIDENV string
+	dmIDENV, _ = os.LookupEnv("CHRDS_DM_ID")
+	if dmIDENV != "" {
+		appCfg.DM.ID = dmIDENV
+	}
+
+	// TLS for main service
+	var tlsCertPathENV string
+	tlsCertPathENV, _ = os.LookupEnv("CHRDS_TLS_CERTPATH")
+	if tlsCertPathENV != "" {
+		appCfg.TLS.CERTPATH = tlsCertPathENV
+	}
+	var tlsKeyPathENV string
+	tlsKeyPathENV, _ = os.LookupEnv("CHRDS_TLS_KEYPATH")
+	if tlsKeyPathENV != "" {
+		appCfg.TLS.KEYPATH = tlsKeyPathENV
+	}
+	var tlsKeyPasswordENV string
+	tlsKeyPasswordENV, _ = os.LookupEnv("CHRDS_TLS_KEYPASSWORD")
+	if tlsKeyPasswordENV != "" {
+		appCfg.TLS.KEYPASSWORD = tlsKeyPasswordENV
+	}
+	var tlsCAPathENV string
+	tlsCAPathENV, _ = os.LookupEnv("CHRDS_TLS_CAPATH")
+	if tlsCAPathENV != "" {
+		appCfg.TLS.CAPATH = tlsCAPathENV
+	}
+
+	// The main API + Prometheus Exporter HTTP server
 	var httpHostENV string
 	httpHostENV, _ = os.LookupEnv("CHRDS_HTTP_HOST")
 	if httpHostENV != "" {
@@ -229,43 +305,14 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 			appCfg.HTTP.TLS = boolValue
 		}
 	}
-	var httpCertPathENV string
-	httpCertPathENV, _ = os.LookupEnv("CHRDS_HTTP_CERTPATH")
-	if httpCertPathENV != "" {
-		appCfg.HTTP.CERTPATH = httpCertPathENV
-	}
-	var httpKeyPathENV string
-	httpKeyPathENV, _ = os.LookupEnv("CHRDS_HTTP_KEYPATH")
-	if httpKeyPathENV != "" {
-		appCfg.HTTP.KEYPATH = httpKeyPathENV
-	}
-	var httpCAPathENV string
-	httpCAPathENV, _ = os.LookupEnv("CHRDS_HTTP_CAPATH")
-	if httpCAPathENV != "" {
-		appCfg.HTTP.CAPATH = httpCAPathENV
-	}
-
-	// Worker
-	var workerPoolENV string
-	workerPoolENV, _ = os.LookupEnv("CHRDS_WORKER_POOL")
-	if workerPoolENV != "" {
-		var workerPoolINT int
-		workerPoolINT, err = strconv.Atoi(workerPoolENV)
+	var httpSkipVerifyENV string
+	httpSkipVerifyENV, _ = os.LookupEnv("CHRDS_HTTP_TLS_SKIPVERIFY")
+	if httpSkipVerifyENV != "" {
+		boolValue, err := strconv.ParseBool(httpSkipVerifyENV)
 		if err != nil {
-			log.Print("It was not possible to convert CHRDS_WORKER_POOL (" + err.Error() + ")!")
+			log.Print("It was not possible to convert CHRDS_HTTP_TLS_SKIPVERIFY (" + err.Error() + ")!")
 		} else {
-			appCfg.WORKER.POOL = workerPoolINT
-		}
-	}
-	var workerACTimeENV string
-	workerACTimeENV, _ = os.LookupEnv("CHRDS_WORKER_ACTIME")
-	if workerACTimeENV != "" {
-		var workerACTimeINT int
-		workerACTimeINT, err = strconv.Atoi(workerACTimeENV)
-		if err != nil {
-			log.Print("It was not possible to convert CHRDS_WORKER_ACTIME (" + err.Error() + ")!")
-		} else {
-			appCfg.WORKER.ACTIME = workerACTimeINT
+			appCfg.HTTP.SKIPVERIFY = boolValue
 		}
 	}
 
@@ -285,21 +332,6 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 	dbPasswordENV, _ = os.LookupEnv("CHRDS_DB_PASSWORD")
 	if dbPasswordENV != "" {
 		appCfg.DB.PASSWORD = dbPasswordENV
-	}
-	var dbCertPathENV string
-	dbCertPathENV, _ = os.LookupEnv("CHRDS_DB_CERTPATH")
-	if dbCertPathENV != "" {
-		appCfg.DB.CERTPATH = dbCertPathENV
-	}
-	var dbKeyPathENV string
-	dbKeyPathENV, _ = os.LookupEnv("CHRDS_DB_KEYPATH")
-	if dbKeyPathENV != "" {
-		appCfg.DB.KEYPATH = dbKeyPathENV
-	}
-	var dbCAPathENV string
-	dbCAPathENV, _ = os.LookupEnv("CHRDS_DB_CAPATH")
-	if dbCAPathENV != "" {
-		appCfg.DB.CAPATH = dbCAPathENV
 	}
 	var dbKeySpaceENV string
 	dbKeySpaceENV, _ = os.LookupEnv("CHRDS_DB_KEYSPACE")
@@ -337,14 +369,25 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 			appCfg.DB.TLS = boolValue
 		}
 	}
-	var dbHOSTVERIFICATIONENV string
-	dbHOSTVERIFICATIONENV, _ = os.LookupEnv("CHRDS_DB_HOSTVERIFICATION")
-	if dbHOSTVERIFICATIONENV != "" {
-		boolValue, err := strconv.ParseBool(dbHOSTVERIFICATIONENV)
+	var dbSkipVerifyENV string
+	dbSkipVerifyENV, _ = os.LookupEnv("CHRDS_DB_TLS_SKIPVERIFY")
+	if dbSkipVerifyENV != "" {
+		boolValue, err := strconv.ParseBool(dbSkipVerifyENV)
 		if err != nil {
 			log.Print("It was not possible to convert CHRDS_DB_HOSTVERIFICATION (" + err.Error() + ")!")
 		} else {
-			appCfg.DB.HOSTVERIFICATION = boolValue
+			appCfg.DB.SKIPVERIFY = boolValue
+		}
+	}
+	var dbBatchSizeENV string
+	dbBatchSizeENV, _ = os.LookupEnv("CHRDS_DB_BATCHSIZE")
+	if dbBatchSizeENV != "" {
+		var dbBatchSizeINT int
+		dbBatchSizeINT, err = strconv.Atoi(dbBatchSizeENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_DB_BATCHSIZE (" + err.Error() + ")!")
+		} else {
+			appCfg.DB.BATCHSIZE = dbBatchSizeINT
 		}
 	}
 
@@ -375,6 +418,166 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 	zbxPassiveTypeENV, _ = os.LookupEnv("CHRDS_ZBX_PASSIVETYPE")
 	if zbxPassiveTypeENV != "" {
 		appCfg.ZBX.PASSIVETYPE = zbxPassiveTypeENV
+	}
+
+	// ZBX Worker
+	var zbxWorkerPoolENV string
+	zbxWorkerPoolENV, _ = os.LookupEnv("CHRDS_ZBX_WORKER_POOL")
+	if zbxWorkerPoolENV != "" {
+		var zbxWorkerPoolINT int
+		zbxWorkerPoolINT, err = strconv.Atoi(zbxWorkerPoolENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_ZBX_WORKER_POOL (" + err.Error() + ")!")
+		} else {
+			appCfg.ZBX.WORKERPOOL = zbxWorkerPoolINT
+		}
+	}
+	var zbxWorkerACTimeENV string
+	zbxWorkerACTimeENV, _ = os.LookupEnv("CHRDS_ZBX_WORKER_ACTIME")
+	if zbxWorkerACTimeENV != "" {
+		var zbxWorkerACTimeINT int
+		zbxWorkerACTimeINT, err = strconv.Atoi(zbxWorkerACTimeENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_ZBX_WORKER_ACTIME (" + err.Error() + ")!")
+		} else {
+			appCfg.ZBX.WORKERACTIME = zbxWorkerACTimeINT
+		}
+	}
+
+	// ZBX TLS
+	var zbxTLSENV string
+	zbxTLSENV, _ = os.LookupEnv("CHRDS_ZBX_TLS")
+	if zbxTLSENV != "" {
+		boolValue, err := strconv.ParseBool(zbxTLSENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_ZBX_TLS (" + err.Error() + ")!")
+		} else {
+			appCfg.ZBX.TLS = boolValue
+		}
+	}
+	var zbxSkipVerifyENV string
+	zbxSkipVerifyENV, _ = os.LookupEnv("CHRDS_ZBX_TLS_SKIPVERIFY")
+	if zbxSkipVerifyENV != "" {
+		boolValue, err := strconv.ParseBool(zbxSkipVerifyENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_ZBX_TLS_SKIPVERIFY (" + err.Error() + ")!")
+		} else {
+			appCfg.ZBX.SKIPVERIFY = boolValue
+		}
+	}
+
+	// Prometheus Exporter
+	var prmtExporterEnabledENV string
+	prmtExporterEnabledENV, _ = os.LookupEnv("CHRDS_PRMTEXPORTER_ENABLED")
+	if prmtExporterEnabledENV != "" {
+		appCfg.PRMTEXPORTER.ENABLED, err = strconv.ParseBool(prmtExporterEnabledENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTEXPORTER_ENABLED (" + err.Error() + ")!")
+			appCfg.PRMTEXPORTER.ENABLED = false
+		}
+	}
+	var prmtExporterMetricsPathENV string
+	prmtExporterMetricsPathENV, _ = os.LookupEnv("CHRDS_PRMTEXPORTER_METRICSPATH")
+	if prmtExporterMetricsPathENV != "" {
+		appCfg.PRMTEXPORTER.METRICSPATH = prmtExporterMetricsPathENV
+	}
+
+	// Prometheus Scraper
+	var prmtScraperEnabledENV string
+	prmtScraperEnabledENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_ENABLED")
+	if prmtScraperEnabledENV != "" {
+		appCfg.PRMTSCRAPER.ENABLED, err = strconv.ParseBool(prmtScraperEnabledENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_ENABLED (" + err.Error() + ")!")
+			appCfg.PRMTSCRAPER.ENABLED = false
+		}
+	}
+	var prmtScraperIntervalENV string
+	prmtScraperIntervalENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_INTERVAL")
+	if prmtScraperIntervalENV != "" {
+		var prmtScraperIntervalINT int
+		prmtScraperIntervalINT, err = strconv.Atoi(prmtScraperIntervalENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_INTERVAL (" + err.Error() + ")!")
+		} else {
+			appCfg.PRMTSCRAPER.INTERVAL = time.Duration(prmtScraperIntervalINT) * time.Second
+		}
+	}
+	var prmtScraperTimeoutENV string
+	prmtScraperTimeoutENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_TIMEOUT")
+	if prmtScraperTimeoutENV != "" {
+		var prmtScraperTimeoutINT int
+		prmtScraperTimeoutINT, err = strconv.Atoi(prmtScraperTimeoutENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_TIMEOUT (" + err.Error() + ")!")
+		} else {
+			appCfg.PRMTSCRAPER.TIMEOUT = time.Duration(prmtScraperTimeoutINT) * time.Second
+		}
+	}
+	var prmtScraperRetryAttemptsENV string
+	prmtScraperRetryAttemptsENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_RETRYATTEMPTS")
+	if prmtScraperRetryAttemptsENV != "" {
+		var prmtScraperRetryAttemptsINT int
+		prmtScraperRetryAttemptsINT, err = strconv.Atoi(prmtScraperRetryAttemptsENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_RETRYATTEMPTS (" + err.Error() + ")!")
+		} else {
+			appCfg.PRMTSCRAPER.RETRYATTEMPTS = prmtScraperRetryAttemptsINT
+		}
+	}
+	var prmtScraperRetryDelayENV string
+	prmtScraperRetryDelayENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_RETRYDELAY")
+	if prmtScraperRetryDelayENV != "" {
+		var prmtScraperRetryDelayINT int
+		prmtScraperRetryDelayINT, err = strconv.Atoi(prmtScraperRetryDelayENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_RETRYDELAY (" + err.Error() + ")!")
+		} else {
+			appCfg.PRMTSCRAPER.RETRYDELAY = time.Duration(prmtScraperRetryDelayINT) * time.Second
+		}
+	}
+	var prmtScraperMaxConnectionsENV string
+	prmtScraperMaxConnectionsENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_MAXCONNECTIONS")
+	if prmtScraperMaxConnectionsENV != "" {
+		var prmtScraperMaxConnectionsINT int
+		prmtScraperMaxConnectionsINT, err = strconv.Atoi(prmtScraperMaxConnectionsENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_MAXCONNECTIONS (" + err.Error() + ")!")
+		} else {
+			appCfg.PRMTSCRAPER.MAXCONNECTIONS = prmtScraperMaxConnectionsINT
+		}
+	}
+	var prmtScraperWorkersPoolENV string
+	prmtScraperWorkersPoolENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_WORKERSPOOL")
+	if prmtScraperWorkersPoolENV != "" {
+		var prmtScraperWorkersPoolINT int
+		prmtScraperWorkersPoolINT, err = strconv.Atoi(prmtScraperWorkersPoolENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_WORKERSPOOL (" + err.Error() + ")!")
+			appCfg.PRMTSCRAPER.WORKERSPOOL = 1
+		} else {
+			appCfg.PRMTSCRAPER.WORKERSPOOL = prmtScraperWorkersPoolINT
+		}
+	}
+	var prmtScraperTLSENV string
+	prmtScraperTLSENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_TLS")
+	if prmtScraperTLSENV != "" {
+		boolValue, err := strconv.ParseBool(prmtScraperTLSENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_TLS (" + err.Error() + ")!")
+		} else {
+			appCfg.PRMTSCRAPER.TLS = boolValue
+		}
+	}
+	var prmtScraperSkipVerifyENV string
+	prmtScraperSkipVerifyENV, _ = os.LookupEnv("CHRDS_PRMTSCRAPER_TLS_SKIPVERIFY")
+	if prmtScraperSkipVerifyENV != "" {
+		boolValue, err := strconv.ParseBool(prmtScraperSkipVerifyENV)
+		if err != nil {
+			log.Print("It was not possible to convert CHRDS_PRMTSCRAPER_TLS_SKIPVERIFY (" + err.Error() + ")!")
+		} else {
+			appCfg.PRMTSCRAPER.SKIPVERIFY = boolValue
+		}
 	}
 
 	// Swagger
@@ -488,14 +691,14 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 			appCfg.SMTP.TLS = boolValue
 		}
 	}
-	var smtpHostVerificationENV string
-	smtpHostVerificationENV, _ = os.LookupEnv("CHRDS_SMTP_HOSTVERIFICATION")
-	if smtpHostVerificationENV != "" {
-		boolValue, err := strconv.ParseBool(smtpHostVerificationENV)
+	var smtpSkipVerifyENV string
+	smtpSkipVerifyENV, _ = os.LookupEnv("CHRDS_SMTP_TLS_SKIPVERIFY")
+	if smtpSkipVerifyENV != "" {
+		boolValue, err := strconv.ParseBool(smtpSkipVerifyENV)
 		if err != nil {
-			log.Print("It was not possible to convert CHRDS_SMTP_HOSTVERIFICATION (" + err.Error() + ")!")
+			log.Print("It was not possible to convert CCHRDS_SMTP_TLS_SKIPVERIFY (" + err.Error() + ")!")
 		} else {
-			appCfg.SMTP.HOSTVERIFICATION = boolValue
+			appCfg.SMTP.SKIPVERIFY = boolValue
 		}
 	}
 	var smtpFromENV string
@@ -516,36 +719,50 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 	}
 
 	log.Print("Configuration parameters:")
+	log.Print("DM.ID: ", appCfg.DM.ID)
+
+	log.Print("TLS.CERTPATH: ", appCfg.TLS.CERTPATH)
+	log.Print("TLS.KEYPATH: ", appCfg.TLS.KEYPATH)
+	log.Print("TLS.CAPATH: ", appCfg.TLS.CAPATH)
+
 	log.Print("HTTP.HOST: ", appCfg.HTTP.HOST)
 	log.Print("HTTP.PORT: ", appCfg.HTTP.PORT)
 	log.Print("HTTP.READTIMEOUT: ", appCfg.HTTP.READTIMEOUT)
 	log.Print("HTTP.WRITETIMEOUT: ", appCfg.HTTP.WRITETIMEOUT)
 	log.Print("HTTP.RL: ", appCfg.HTTP.RL)
 	log.Print("HTTP.TLS: ", appCfg.HTTP.TLS)
-	log.Print("HTTP.CERTPATH: ", appCfg.HTTP.CERTPATH)
-	log.Print("HTTP.KEYPATH: ", appCfg.HTTP.KEYPATH)
-	log.Print("HTTP.CAPATH: ", appCfg.HTTP.CAPATH)
-
-	log.Print("WORKER.POOL: ", appCfg.WORKER.POOL)
-	log.Print("WORKER.POOL: ", appCfg.WORKER.ACTIME)
+	log.Print("HTTP.SKIPVERIFY: ", appCfg.HTTP.SKIPVERIFY)
 
 	log.Print("DB.HOSTS: ", appCfg.DB.HOSTS)
 	log.Print("DB.USERNAME: ", appCfg.DB.USERNAME)
 	log.Print("DB.TLS: ", appCfg.DB.TLS)
-	log.Print("DB.CERTPATH: ", appCfg.DB.CERTPATH)
-	log.Print("DB.KEYPATH: ", appCfg.DB.KEYPATH)
-	log.Print("DB.CAPATH: ", appCfg.DB.CAPATH)
-	log.Print("DB.HOSTVERIFICATION: ", appCfg.DB.HOSTVERIFICATION)
+	log.Print("DB.SKIPVERIFY: ", appCfg.DB.SKIPVERIFY)
 	log.Print("DB.KEYSPACE: ", appCfg.DB.KEYSPACE)
 	log.Print("DB.CONSISTENCY: ", appCfg.DB.CONSISTENCY)
 	log.Print("DB.CONSISTENCYREAD: ", appCfg.DB.CONSISTENCYREAD)
 	log.Print("DB.TIMEOUT: ", appCfg.DB.TIMEOUT)
+	log.Print("DB.BATCHSIZE: ", appCfg.DB.BATCHSIZE)
 
 	log.Print("ZBX.HOST: ", appCfg.ZBX.HOST)
 	log.Print("ZBX.PORT: ", appCfg.ZBX.PORT)
 	log.Print("ZBX.TYPE: ", appCfg.ZBX.TYPE)
 	log.Print("ZBX.PASSIVEPORT: ", appCfg.ZBX.PASSIVEPORT)
 	log.Print("ZBX.PASSIVETYPE: ", appCfg.ZBX.PASSIVETYPE)
+	log.Print("ZBX.TLS: ", appCfg.ZBX.TLS)
+	log.Print("ZBX.SKIPVERIFY: ", appCfg.ZBX.SKIPVERIFY)
+	log.Print("ZBX.WORKERPOOL: ", appCfg.ZBX.WORKERPOOL)
+	log.Print("ZBX.WORKERACTIME: ", appCfg.ZBX.WORKERACTIME)
+
+	log.Print("PRMTEXPORTER.ENABLED: ", appCfg.PRMTEXPORTER.ENABLED)
+	log.Print("PRMTEXPORTER.METRICSPATH: ", appCfg.PRMTEXPORTER.METRICSPATH)
+
+	log.Print("PRMTSCRAPER.ENABLED: ", appCfg.PRMTSCRAPER.ENABLED)
+	log.Print("PRMTSCRAPER.INTERVAL: ", appCfg.PRMTSCRAPER.INTERVAL)
+	log.Print("PRMTSCRAPER.TIMEOUT: ", appCfg.PRMTSCRAPER.TIMEOUT)
+	log.Print("PRMTSCRAPER.RETRYATTEMPTS: ", appCfg.PRMTSCRAPER.RETRYATTEMPTS)
+	log.Print("PRMTSCRAPER.RETRYDELAY: ", appCfg.PRMTSCRAPER.RETRYDELAY)
+	log.Print("PRMTSCRAPER.MAXCONNECTIONS: ", appCfg.PRMTSCRAPER.MAXCONNECTIONS)
+	log.Print("PRMTSCRAPER.WORKERSPOOL: ", appCfg.PRMTSCRAPER.WORKERSPOOL)
 
 	log.Print("SWG.TITLE: ", appCfg.SWG.TITLE)
 	log.Print("SWG.DESCRIPTION: ", appCfg.SWG.DESCRIPTION)
@@ -562,7 +779,7 @@ func (appCfg *TAppConfig) LoadConfig() (err error) {
 	log.Print("SMTP.TIMEOUTCONNECT: ", appCfg.SMTP.TIMEOUTCONNECT)
 	log.Print("SMTP.TIMEOUTSEND: ", appCfg.SMTP.TIMEOUTSEND)
 	log.Print("SMTP.TLS: ", appCfg.SMTP.TLS)
-	log.Print("SMTP.HOSTVERIFICATION: ", appCfg.SMTP.HOSTVERIFICATION)
+	log.Print("SMTP.SKIPVERIFY: ", appCfg.SMTP.SKIPVERIFY)
 	log.Print("SMTP.FROM: ", appCfg.SMTP.FROM)
 	log.Print("SMTP.QUEUE: ", appCfg.SMTP.QUEUE)
 

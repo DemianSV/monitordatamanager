@@ -10,18 +10,20 @@ import (
 	mail "github.com/xhit/go-simple-mail/v2"
 )
 
-func smtpProducer(toA []string, subject string, text string) {
+func smtpProducer(toA []string, alertType string, subject string, text string) {
 	type EMailContent struct {
-		Tittle string
-		Text   string
+		Tittle    string
+		Text      string
+		AlertType string
 	}
 
 	log.Print("Sending EMail alerts to QUEUE...")
 
 	tmpl, err := template.ParseFiles("email.tmpl")
 	tmplContent := EMailContent{ // Structure for filling EMail template
-		Tittle: subject,
-		Text:   text,
+		Tittle:    subject,
+		Text:      text,
+		AlertType: alertType,
 	}
 	if err != nil {
 		log.Print("Not a successful open template EMail messages (", err, ")")
@@ -48,11 +50,12 @@ func smtpProducer(toA []string, subject string, text string) {
 
 func smtpConsumer() {
 	if AppConfig.SMTP.ENABLED {
-		log.Print("SMTP Consumer is started")
+		log.Printf("START SMTP CONSUMER... %s", "OK")
 		for {
 			msg, ok := <-SMTPQueue
+			defer close(SMTPQueue)
 			if !ok {
-				log.Println("The SMTPQueue channel is closed, the processing of messages is stopped")
+				log.Println("The SMTP queue channel is closed, the processing of messages is stopped")
 				return
 			}
 			log.Print("Sending EMail messages...")
@@ -87,8 +90,11 @@ func smtpConsumer() {
 			// Timeout for send the data and wait respond
 			server.SendTimeout = time.Duration(AppConfig.SMTP.TIMEOUTSEND) * time.Second
 
-			if AppConfig.SMTP.TLS && !AppConfig.SMTP.HOSTVERIFICATION {
-				server.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+			if AppConfig.SMTP.TLS {
+				server.TLSConfig = &tls.Config{
+					InsecureSkipVerify: AppConfig.SMTP.SKIPVERIFY,
+					MinVersion:         tls.VersionTLS12,
+				}
 			}
 
 			for _, to := range msg.ToA {

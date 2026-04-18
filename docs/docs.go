@@ -15,53 +15,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/data/get": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Data"
-                ],
-                "summary": "Get operational monitoring data from the database",
-                "parameters": [
-                    {
-                        "description": "Input structure",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/main.RequestRawDataGetT"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.ResponseRawDataGetArrayT"
-                        }
-                    },
-                    "204": {
-                        "description": "NoContent"
-                    },
-                    "403": {
-                        "description": "Forbidden, The monitoring module key is incorrect, or not registered"
-                    },
-                    "500": {
-                        "description": "Internal server error, The internal error of the service"
-                    }
-                }
-            }
-        },
         "/data/save": {
             "post": {
                 "security": [
@@ -96,89 +49,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/main.ResponseRawDataSaveArrayT"
                         }
-                    },
-                    "403": {
-                        "description": "Forbidden, The monitoring module key is incorrect, or not registered"
-                    },
-                    "500": {
-                        "description": "Internal server error, The internal error of the service"
-                    }
-                }
-            }
-        },
-        "/task/get": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Task"
-                ],
-                "summary": "Get a list of all your task to fulfill",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.ResponseTaskGetArrayT"
-                        }
-                    },
-                    "204": {
-                        "description": "NoContent"
-                    },
-                    "403": {
-                        "description": "Forbidden, The monitoring module key is incorrect, or not registered"
-                    },
-                    "500": {
-                        "description": "Internal server error, The internal error of the service"
-                    }
-                }
-            }
-        },
-        "/text/get": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Data"
-                ],
-                "summary": "Get text data from the database",
-                "parameters": [
-                    {
-                        "description": "Input structure",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/main.RequestRawDataGetT"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.ResponseRawTextGetArrayT"
-                        }
-                    },
-                    "204": {
-                        "description": "NoContent"
                     },
                     "403": {
                         "description": "Forbidden, The monitoring module key is incorrect, or not registered"
@@ -268,17 +138,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "main.RequestRawDataGetT": {
-            "type": "object",
-            "properties": {
-                "metric": {
-                    "type": "string"
-                },
-                "spaceid": {
-                    "type": "string"
-                }
-            }
-        },
         "main.RequestRawDataSaveArrayT": {
             "type": "object",
             "properties": {
@@ -341,43 +200,6 @@ const docTemplate = `{
                 }
             }
         },
-        "main.ResponseRawDataGetArrayT": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/main.ResponseRawDataGetT"
-                    }
-                }
-            }
-        },
-        "main.ResponseRawDataGetT": {
-            "type": "object",
-            "properties": {
-                "createtime": {
-                    "type": "integer"
-                },
-                "eventtime": {
-                    "type": "integer"
-                },
-                "metric": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "spaceid": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "integer"
-                },
-                "value": {
-                    "type": "number"
-                }
-            }
-        },
         "main.ResponseRawDataSaveArrayT": {
             "type": "object",
             "properties": {
@@ -403,80 +225,6 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "integer"
-                }
-            }
-        },
-        "main.ResponseRawTextGetArrayT": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/main.ResponseRawTextGetT"
-                    }
-                }
-            }
-        },
-        "main.ResponseRawTextGetT": {
-            "type": "object",
-            "properties": {
-                "createtime": {
-                    "type": "integer"
-                },
-                "eventtime": {
-                    "type": "integer"
-                },
-                "metric": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "spaceid": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "integer"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "main.ResponseTaskGetArrayT": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/main.ResponseTaskGetT"
-                    }
-                }
-            }
-        },
-        "main.ResponseTaskGetT": {
-            "type": "object",
-            "properties": {
-                "critical": {
-                    "type": "string"
-                },
-                "interval": {
-                    "type": "integer"
-                },
-                "metric": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "spaceid": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "integer"
-                },
-                "warning": {
-                    "type": "string"
                 }
             }
         },

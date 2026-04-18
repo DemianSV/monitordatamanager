@@ -1,10 +1,10 @@
-/* Version 1.0.4 */
+/* Version 1.0.4 INIT */
 
 /* Create the space of the Chrds keys */
 CREATE KEYSPACE IF NOT EXISTS chrds WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter01': '1'}  AND durable_writes = true;
 
 /* Create a user chrds (Password: CHRDSpass5) for applications */
-CREATE ROLE IF NOT EXISTS chrds with SUPERUSER = false AND LOGIN = true and PASSWORD = 'chrds';
+CREATE ROLE IF NOT EXISTS chrds with SUPERUSER = false AND LOGIN = true and PASSWORD = 'CHRDSpass5';
 
 /* We give out the necessary grants */
 GRANT ALL ON KEYSPACE chrds TO chrds;
@@ -243,3 +243,131 @@ CREATE TABLE IF NOT EXISTS chrds.emaillist_data (
 );
 
 ALTER TABLE chrds.task ADD IF NOT EXISTS emaillist_id uuid;
+
+/* Version 1.1.0 */
+
+/* Fields for supporting Prometheus protocol and optimistic blocking */
+ALTER TABLE chrds.task ADD IF NOT EXISTS ol uuid;
+ALTER TABLE chrds.task ADD IF NOT EXISTS ol_time bigint;
+
+ALTER TABLE chrds.registration ADD IF NOT EXISTS address text;
+
+ALTER TABLE chrds.raw_data01 ADD IF NOT EXISTS labels map<text, text>;
+ALTER TABLE chrds.raw_data02 ADD IF NOT EXISTS labels map<text, text>;
+ALTER TABLE chrds.raw_data03 ADD IF NOT EXISTS labels map<text, text>;
+
+ALTER TABLE chrds.dashboard ADD IF NOT EXISTS interval bigint;
+
+ALTER TABLE IF EXISTS raw_data01 DROP IF EXISTS status;
+ALTER TABLE IF EXISTS raw_data02 DROP IF EXISTS status;
+ALTER TABLE IF EXISTS raw_data03 DROP IF EXISTS status;
+ALTER TABLE IF EXISTS raw_text01 DROP IF EXISTS status;
+ALTER TABLE IF EXISTS raw_text02 DROP IF EXISTS status;
+
+/* We set the compaction strategy and data expiration (TTL) for raw data tables */
+ALTER TABLE chrds.raw_data01 WITH compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_size': '1', 'compaction_window_unit': 'DAYS'} AND default_time_to_live = 2592000;
+ALTER TABLE chrds.raw_data02 WITH compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_size': '1', 'compaction_window_unit': 'DAYS'} AND default_time_to_live = 2592000;
+ALTER TABLE chrds.raw_data03 WITH compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_size': '1', 'compaction_window_unit': 'DAYS'} AND default_time_to_live = 2592000;
+ALTER TABLE chrds.raw_text01 WITH compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_size': '1', 'compaction_window_unit': 'DAYS'} AND default_time_to_live = 2592000;
+ALTER TABLE chrds.raw_text02 WITH compaction = {'class': 'TimeWindowCompactionStrategy', 'compaction_window_size': '1', 'compaction_window_unit': 'DAYS'} AND default_time_to_live = 2592000;
+
+ALTER TABLE chrds.task ADD IF NOT EXISTS dm_id uuid;
+
+/* Оптимизация хранения метрик и текстовых данных */
+CREATE TABLE chrds.raw_text (
+    space_id uuid,
+    metric text,
+    event_time bigint,
+    create_time bigint,
+    object text,
+    space_description text,
+    value text,
+    PRIMARY KEY ((space_id, metric), event_time)
+) WITH CLUSTERING ORDER BY (event_time DESC)
+    AND additional_write_policy = '99p'
+    AND allow_auto_snapshot = true
+    AND bloom_filter_fp_chance = 0.01
+    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+    AND cdc = false
+    AND comment = ''
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy', 'compaction_window_size': '1', 'compaction_window_unit': 'DAYS', 'max_threshold': '32', 'min_threshold': '4'}
+    AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND memtable = 'default'
+    AND crc_check_chance = 1.0
+    AND default_time_to_live = 2592000
+    AND extensions = {}
+    AND gc_grace_seconds = 864000
+    AND incremental_backups = true
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair = 'BLOCKING'
+    AND speculative_retry = '99p';
+
+CREATE TABLE chrds.raw_data (
+    space_id uuid,
+    metric text,
+    event_time bigint,
+    create_time bigint,
+    object text,
+    space_description text,
+    value float,
+    labels map<text, text>,
+    PRIMARY KEY ((space_id, metric), event_time)
+) WITH CLUSTERING ORDER BY (event_time DESC)
+    AND additional_write_policy = '99p'
+    AND allow_auto_snapshot = true
+    AND bloom_filter_fp_chance = 0.01
+    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+    AND cdc = false
+    AND comment = ''
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy', 'compaction_window_size': '1', 'compaction_window_unit': 'DAYS', 'max_threshold': '32', 'min_threshold': '4'}
+    AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND memtable = 'default'
+    AND crc_check_chance = 1.0
+    AND default_time_to_live = 2592000
+    AND extensions = {}
+    AND gc_grace_seconds = 864000
+    AND incremental_backups = true
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair = 'BLOCKING'
+    AND speculative_retry = '99p';
+
+/* Счетчик записей raw таблиц */
+CREATE TABLE chrds.raw_count (
+    space_id uuid,
+    raw_type text,
+    value bigint,
+    create_time bigint,
+    PRIMARY KEY ((space_id, raw_type), create_time)
+) WITH CLUSTERING ORDER BY (create_time DESC)
+    AND additional_write_policy = '99p'
+    AND allow_auto_snapshot = true
+    AND bloom_filter_fp_chance = 0.01
+    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
+    AND cdc = false
+    AND comment = ''
+    AND compaction = {'class': 'org.apache.cassandra.db.compaction.TimeWindowCompactionStrategy', 'compaction_window_size': '1', 'compaction_window_unit': 'DAYS', 'max_threshold': '32', 'min_threshold': '4'}
+    AND compression = {'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+    AND memtable = 'default'
+    AND crc_check_chance = 1.0
+    AND default_time_to_live = 2592000
+    AND extensions = {}
+    AND gc_grace_seconds = 864000
+    AND incremental_backups = true
+    AND max_index_interval = 2048
+    AND memtable_flush_period_in_ms = 0
+    AND min_index_interval = 128
+    AND read_repair = 'BLOCKING'
+    AND speculative_retry = '99p';
+
+    DROP TABLE raw_data01;
+    DROP TABLE raw_data02;
+    DROP TABLE raw_data03;
+    DROP TABLE raw_text01;
+    DROP TABLE raw_text02;
+    DROP TABLE raw_key;
+
+    GRANT SELECT ON chrds.raw_data TO grafana;
