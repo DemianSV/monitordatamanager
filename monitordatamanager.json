@@ -72,9 +72,9 @@
 	},
 	"SWG": {
 		"TITLE": "Swagger Charibdis DataManager API",
-		"DESCRIPTION": "Monitoring system Charibdis DataManager",
+		"DESCRIPTION": "Monitoring system Polyxena DataManager",
 		"VERSION": "1.0",
-		"HOST": "monitor.services.ru:6443",
+		"HOST": "",
 		"BASEPATH": "/api/v1",
 		"SCHEME": "https"
 	}
