@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chrdsdatamanager/tlsutil"
+	"monitordatamanager/tlsutil"
 
 	"context"
 	"crypto/tls"
@@ -398,7 +398,7 @@ func (s *Scraper) scrapeWithRetry(address string, moduleID string) ([]MetricData
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "CHRDSDataManager")
+	req.Header.Set("User-Agent", "MONITORDataManager")
 	req.Header.Set("Accept", "text/plain")
 
 	resp, err := s.client.Do(req)

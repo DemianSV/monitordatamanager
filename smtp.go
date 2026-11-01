@@ -79,7 +79,20 @@ func smtpConsumer() {
 			// - LOGIN
 			// - CRAM-MD5
 			// - None
-			// server.Authentication = mail.AuthAuto
+			switch AppConfig.SMTP.AUTH {
+			case "auto":
+				server.Authentication = mail.AuthAuto
+			case "plain":
+				server.Authentication = mail.AuthPlain
+			case "login":
+				server.Authentication = mail.AuthLogin
+			case "crammd5", "cram-md5":
+				server.Authentication = mail.AuthCRAMMD5
+			case "none":
+				server.Authentication = mail.AuthNone
+			default:
+				server.Authentication = mail.AuthAuto
+			}
 
 			// Variable to keep alive connection
 			server.KeepAlive = AppConfig.SMTP.KEEPALIVE
@@ -111,15 +124,15 @@ func smtpConsumer() {
 
 				smtpClient, err := server.Connect()
 				if err != nil {
-					log.Print("Failed to connect to the SMTP server (", err, ")")
-				}
-
-				// Call Send and pass the client
-				err = email.Send(smtpClient)
-				if err != nil {
-					log.Print("EMail message failed to ", to, " (", err, ")")
+					log.Print("Failed to connect to the SMTP server ", server.Host, ", ", server.Authentication, " (", err, ")")
 				} else {
-					log.Print("EMail message successfully sent to ", to)
+					// Call Send and pass the client
+					err = email.Send(smtpClient)
+					if err != nil {
+						log.Print("EMail message failed to ", to, " (", err, ")")
+					} else {
+						log.Print("EMail message successfully sent to ", to)
+					}
 				}
 			}
 		}

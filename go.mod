@@ -1,6 +1,6 @@
-module chrdsdatamanager
+module monitordatamanager
 
-go 1.26.2
+go 1.27.2
 
 require (
 	github.com/go-chi/chi/v5 v5.2.5
@@ -44,6 +44,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-require chrdsdatamanager/tlsutil v0.0.0
+require monitordatamanager/tlsutil v0.0.0
 
-replace chrdsdatamanager/tlsutil => ./tlsutil
+replace monitordatamanager/tlsutil => ./tlsutil

@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"chrdsdatamanager/tlsutil"
+	"monitordatamanager/tlsutil"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -27,18 +27,18 @@ import (
 
 	"github.com/gocql/gocql"
 
-	"chrdsdatamanager/docs"
+	"monitordatamanager/docs"
 
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
 const (
 	// Version
-	Version string = "1.1.0"
+	Version string = "1.1.1"
 	// LogFile General log file
-	LogFile string = "chrdsdatamanager.log"
+	LogFile string = "monitordatamanager.log"
 	// ConfigFile General configuration file
-	ConfigFile string = "chrdsdatamanager.json"
+	ConfigFile string = "monitordatamanager.json"
 )
 
 // FlagLog Type of log FILE - STDOUT
@@ -705,7 +705,7 @@ func problem(spaceID string, modulID string, metric string, eventTime int64, val
 								log.Printf("Optimistic block problem update... OK")
 								log.Print("PROBLEM UPDATE")
 								if len(emailA) > 0 {
-									go smtpProducer(emailA, status, ("CHRDS" + " " + status + " " + spaceName(spaceID) + "(" + moduleName(modulID) + ")"), (metric + " " + valueAllType + " " + statusDB + " -> " + status))
+									go smtpProducer(emailA, status, ("MONITOR" + " " + status + " " + spaceName(spaceID) + "(" + moduleName(modulID) + ")"), (metric + " " + valueAllType + " " + statusDB + " to " + status))
 								}
 							} else {
 								log.Printf("Optimistic block problem update... FALSE")
@@ -755,7 +755,7 @@ func problem(spaceID string, modulID string, metric string, eventTime int64, val
 						log.Printf("Optimistic block problem insert... OK")
 						log.Print("PROBLEM INSERT")
 						if len(emailA) > 0 {
-							go smtpProducer(emailA, status, ("CHRDS" + " " + status + " " + spaceName(spaceID) + "(" + moduleName(modulID) + ")"), (metric + " " + valueAllType + " " + status))
+							go smtpProducer(emailA, status, ("MONITOR" + " " + status + " " + spaceName(spaceID) + "(" + moduleName(modulID) + ")"), (metric + " " + valueAllType + " " + status))
 						}
 					} else {
 						log.Printf("Optimistic block problem insert... FALSE")
